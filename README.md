@@ -53,7 +53,7 @@ Activated when `MLFLOW_TRACKING_URI` is set. Creates hierarchical MLflow runs wi
 
 **Task run showing 17 metrics and parameters from a tool-using eval:**
 
-![Task run detail](docs/images/screenshot-02-task-run.png)
+![Task run detail](https://raw.githubusercontent.com/debu-sinha/inspect-mlflow/main/docs/images/screenshot-02-task-run.png)
 
 ### Tracing Hook
 
@@ -90,15 +90,15 @@ eval_run:98h4b4KN (CHAIN)
 
 **Traces list showing 3 eval runs (simple math + tool-using calculator eval):**
 
-![Traces list](docs/images/screenshot-04-traces-list.png)
+![Traces list](https://raw.githubusercontent.com/debu-sinha/inspect-mlflow/main/docs/images/screenshot-04-traces-list.png)
 
 **Full span tree showing solver/scorer hierarchy with tool calls:**
 
-![Span tree](docs/images/inspect-tracing-04-timeline.png)
+![Span tree](https://raw.githubusercontent.com/debu-sinha/inspect-mlflow/main/docs/images/inspect-tracing-04-timeline.png)
 
 **LLM span detail with model name, token counts, and response:**
 
-![LLM detail](docs/images/inspect-tracing-05-model-expanded.png)
+![LLM detail](https://raw.githubusercontent.com/debu-sinha/inspect-mlflow/main/docs/images/inspect-tracing-05-model-expanded.png)
 
 ## Configuration
 

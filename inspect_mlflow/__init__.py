@@ -15,7 +15,7 @@ Install and use:
     inspect eval my_task.py
 """
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 
 from inspect_mlflow.tracing import MlflowTracingHooks
 from inspect_mlflow.tracking import MlflowTrackingHooks
