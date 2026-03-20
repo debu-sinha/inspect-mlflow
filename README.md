@@ -1,13 +1,11 @@
-<p align="center">
-  <img src="https://raw.githubusercontent.com/debu-sinha/inspect-mlflow/main/docs/images/logo.png" alt="inspect-mlflow" width="500">
-</p>
+# inspect-mlflow
 
-<p align="center">
-  <a href="https://github.com/debu-sinha/inspect-mlflow/actions/workflows/ci.yml"><img src="https://github.com/debu-sinha/inspect-mlflow/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://github.com/debu-sinha/inspect-mlflow/actions/workflows/codeql.yml"><img src="https://github.com/debu-sinha/inspect-mlflow/actions/workflows/codeql.yml/badge.svg" alt="CodeQL"></a>
-  <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.11%2B-blue.svg" alt="Python 3.11+"></a>
-  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License: MIT"></a>
-</p>
+![logo](https://raw.githubusercontent.com/debu-sinha/inspect-mlflow/main/docs/images/logo.png)
+
+[![CI](https://github.com/debu-sinha/inspect-mlflow/actions/workflows/ci.yml/badge.svg)](https://github.com/debu-sinha/inspect-mlflow/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/debu-sinha/inspect-mlflow/actions/workflows/codeql.yml/badge.svg)](https://github.com/debu-sinha/inspect-mlflow/actions/workflows/codeql.yml)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
 MLflow integration for [Inspect AI](https://inspect.aisi.org.uk/). Provides experiment tracking, execution tracing, and artifact logging for Inspect AI evaluations.
 
