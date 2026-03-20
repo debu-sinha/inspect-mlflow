@@ -1,9 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 80">
-  <!-- White background for dark mode compatibility -->
-  <rect x="0" y="0" width="680" height="80" rx="12" fill="#ffffff"/>
-  <!-- AISI "Inspect" logo mark (red A|S| letterforms) -->
-  <g transform="translate(10, 16) scale(1)">
-    <svg width="143" height="48" viewBox="0 0 143 48" fill="none">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 80">
+  <!-- White background for dark mode -->
+  <rect x="0" y="0" width="720" height="80" rx="12" fill="#ffffff"/>
+
+  <!-- AISI red lettermark -->
+  <g transform="translate(16, 16) scale(1)">
+    <svg width="95" height="48" viewBox="0 0 108 48" fill="none">
       <path d="M53.7019 0.230469H47.7339V47.6157H53.7019V0.230469Z" fill="#F90D29"/>
       <path d="M107.312 0.230469H101.344V47.6157H107.312V0.230469Z" fill="#F90D29"/>
       <path d="M41.1464 47.6166H34.7945L20.5745 8.54227L6.3519 47.6166H0L17.2471 0.232422H23.8998L41.1464 47.6166Z" fill="#F90D29"/>
@@ -11,14 +12,18 @@
     </svg>
   </g>
 
-  <!-- "inspect" text in AISI style -->
-  <text x="165" y="50" font-family="system-ui, -apple-system, sans-serif" font-size="28" font-weight="600" fill="#101828" letter-spacing="1">inspect</text>
+  <!-- Vertical divider (matches AISI brand) -->
+  <line x1="118" y1="20" x2="118" y2="60" stroke="#868e96" stroke-width="1.5"/>
 
-  <!-- Separator -->
-  <text x="310" y="50" font-family="system-ui, -apple-system, sans-serif" font-size="28" font-weight="300" fill="#868e96">-</text>
+  <!-- "AI SECURITY INSTITUTE" text (two lines, matching their brand) -->
+  <text x="128" y="36" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600" fill="#101828" letter-spacing="2">AI SECURITY</text>
+  <text x="128" y="54" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="600" fill="#101828" letter-spacing="2">INSTITUTE</text>
+
+  <!-- Connector -->
+  <text x="280" y="48" font-family="system-ui, -apple-system, sans-serif" font-size="32" font-weight="200" fill="#868e96">+</text>
 
   <!-- MLflow official wordmark -->
-  <g transform="translate(330, 18)">
+  <g transform="translate(320, 18)">
     <svg width="218" height="44" viewBox="0 0 109 40" fill="none">
       <path d="M0 31.0316V15.5024H3.54258V17.4699C4.43636 15.8756 6.38278 15.045 8.13589 15.045C10.178 15.045 11.9636 15.9713 12.7943 17.7895C14.0096 15.7474 15.8278 15.045 17.8373 15.045C20.6469 15.045 23.3263 16.8325 23.3263 20.9493V31.0316H19.7531V21.5541C19.7531 19.7359 18.8268 18.3636 16.7522 18.3636C14.8057 18.3636 13.5292 19.8947 13.5292 21.8086V31.0297H9.89282V21.5541C9.89282 19.7684 8.99522 18.3732 6.88995 18.3732C4.91292 18.3732 3.66699 19.8412 3.66699 21.8182V31.0392Z" fill="#212529"/>
       <path d="M27.8546 31.0316V7.92917H31.5579V31.0316Z" fill="#212529"/>
