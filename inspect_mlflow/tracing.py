@@ -22,7 +22,7 @@ import logging
 import os
 from typing import Any
 
-import mlflow  # type: ignore[import-not-found]
+import mlflow
 from inspect_ai.event._model import ModelEvent
 from inspect_ai.event._score import ScoreEvent
 from inspect_ai.event._span import SpanBeginEvent, SpanEndEvent
@@ -39,14 +39,9 @@ from inspect_ai.hooks import (
     hooks,
 )
 
-logger = logging.getLogger(__name__)
+from inspect_mlflow.util import truncate
 
-
-def _truncate(text: Any, max_len: int = 200) -> str:
-    s = str(text) if text is not None else ""
-    if len(s) > max_len:
-        return s[: max_len - 3] + "..."
-    return s
+_logger = logging.getLogger(__name__)
 
 
 @hooks(name="mlflow_tracing", description="MLflow Tracing")
@@ -86,7 +81,7 @@ class MlflowTracingHooks(Hooks):
             )
             self._run_spans[data.run_id] = span
         except Exception:
-            logger.debug("Failed to start run span", exc_info=True)
+            _logger.debug("Failed to start run span", exc_info=True)
 
     async def on_run_end(self, data: RunEnd) -> None:
         span = self._run_spans.pop(data.run_id, None)
@@ -101,7 +96,7 @@ class MlflowTracingHooks(Hooks):
                 outputs["error"] = str(data.exception)
             span.end(outputs=outputs, status=status)
         except Exception:
-            logger.debug("Failed to end run span", exc_info=True)
+            _logger.debug("Failed to end run span", exc_info=True)
 
         self._task_spans.clear()
         self._sample_spans.clear()
@@ -130,7 +125,7 @@ class MlflowTracingHooks(Hooks):
             )
             self._task_spans[data.eval_id] = span
         except Exception:
-            logger.debug("Failed to start task span", exc_info=True)
+            _logger.debug("Failed to start task span", exc_info=True)
 
     async def on_task_end(self, data: TaskEnd) -> None:
         span = self._task_spans.pop(data.eval_id, None)
@@ -155,7 +150,7 @@ class MlflowTracingHooks(Hooks):
             status = "OK" if log.status == "success" else "ERROR"
             span.end(outputs=outputs, status=status)
         except Exception:
-            logger.debug("Failed to end task span", exc_info=True)
+            _logger.debug("Failed to end task span", exc_info=True)
 
     async def on_sample_start(self, data: SampleStart) -> None:
         parent = self._task_spans.get(data.eval_id)
@@ -175,7 +170,7 @@ class MlflowTracingHooks(Hooks):
             )
             self._sample_spans[data.sample_id] = span
         except Exception:
-            logger.debug("Failed to start sample span", exc_info=True)
+            _logger.debug("Failed to start sample span", exc_info=True)
 
     async def on_sample_end(self, data: SampleEnd) -> None:
         span = self._sample_spans.pop(data.sample_id, None)
@@ -194,7 +189,7 @@ class MlflowTracingHooks(Hooks):
 
             if sample.output and sample.output.choices:
                 first = sample.output.choices[0]
-                outputs["output"] = _truncate(first.message.text, 500)
+                outputs["output"] = truncate(first.message.text, 500)
 
             has_error = getattr(sample, "error", None) is not None
             status = "ERROR" if has_error else "OK"
@@ -203,7 +198,7 @@ class MlflowTracingHooks(Hooks):
 
             span.end(outputs=outputs, status=status)
         except Exception:
-            logger.debug("Failed to end sample span", exc_info=True)
+            _logger.debug("Failed to end sample span", exc_info=True)
 
     async def on_sample_event(self, data: SampleEvent) -> None:
         sample_span = self._sample_spans.get(data.sample_id)
@@ -224,7 +219,7 @@ class MlflowTracingHooks(Hooks):
             elif isinstance(event, ScoreEvent):
                 self._handle_score_event(event, sample_span)
         except Exception:
-            logger.debug("Failed to handle sample event", exc_info=True)
+            _logger.debug("Failed to handle sample event", exc_info=True)
 
     def _handle_span_begin(self, event: SpanBeginEvent, sample_span: Any) -> None:
         parent = sample_span
@@ -281,7 +276,7 @@ class MlflowTracingHooks(Hooks):
 
         if event.output and event.output.choices:
             first = event.output.choices[0]
-            outputs["response"] = _truncate(first.message.text, 500)
+            outputs["response"] = truncate(first.message.text, 500)
 
         span = mlflow.start_span_no_context(
             name=f"model:{event.model}",
@@ -309,7 +304,7 @@ class MlflowTracingHooks(Hooks):
         attrs: dict[str, Any] = {"inspect.tool_id": event.id}
 
         if event.result is not None:
-            outputs["result"] = _truncate(event.result, 500)
+            outputs["result"] = truncate(event.result, 500)
 
         if event.working_time is not None:
             attrs["working_time"] = event.working_time
@@ -335,11 +330,11 @@ class MlflowTracingHooks(Hooks):
 
         inputs: dict[str, Any] = {}
         if event.target:
-            inputs["target"] = _truncate(event.target, 200)
+            inputs["target"] = truncate(event.target, 200)
 
         outputs: dict[str, Any] = {"value": event.score.value}
         if event.score.explanation:
-            outputs["explanation"] = _truncate(event.score.explanation, 500)
+            outputs["explanation"] = truncate(event.score.explanation, 500)
 
         attrs: dict[str, Any] = {"intermediate": event.intermediate}
 

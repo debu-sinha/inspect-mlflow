@@ -17,11 +17,27 @@ def safe_log_params(mlflow: Any, params: dict[str, Any]) -> None:
 
 
 def score_to_numeric(value: Any) -> float | None:
-    """Convert a Score value to a numeric value for MLflow metrics."""
+    """Convert a Score value to a numeric value for MLflow metrics.
+
+    Handles Inspect AI score conventions:
+    - int/float: returned as-is
+    - bool: True -> 1.0, False -> 0.0
+    - str: "C"/"correct" -> 1.0, "I"/"incorrect" -> 0.0, "P"/"partial" -> 0.5
+    - other: None (metric skipped)
+    """
+    if isinstance(value, bool):
+        return float(value)
     if isinstance(value, (int, float)):
         return float(value)
     if isinstance(value, str):
-        mapping = {"C": 1.0, "I": 0.0, "P": 0.5, "correct": 1.0, "incorrect": 0.0}
+        mapping = {
+            "C": 1.0,
+            "correct": 1.0,
+            "I": 0.0,
+            "incorrect": 0.0,
+            "P": 0.5,
+            "partial": 0.5,
+        }
         return mapping.get(value)
     return None
 

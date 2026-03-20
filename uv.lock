@@ -1495,7 +1495,7 @@ dev = [
 requires-dist = [
     { name = "inspect-ai", specifier = ">=0.3.180" },
     { name = "inspect-scout", marker = "extra == 'scout'", specifier = ">=0.1.0" },
-    { name = "mlflow", specifier = ">=3.0" },
+    { name = "mlflow", specifier = ">=3.0,<4.0" },
 ]
 provides-extras = ["scout"]
 

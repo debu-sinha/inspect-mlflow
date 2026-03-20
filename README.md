@@ -17,7 +17,7 @@ pip install inspect-mlflow
 
 ## Quick Start
 
-No code changes needed. Install the package, set env vars, and run evals as usual.
+No code changes needed. Hooks auto-register via entry points when the package is installed. Set env vars and run evals as usual.
 
 ```bash
 # Start MLflow server
