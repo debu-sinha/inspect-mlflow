@@ -1,6 +1,6 @@
 [project]
 name = "inspect-mlflow"
-version = "0.1.2"
+version = "0.2.0"
 description = "MLflow integration for Inspect AI: experiment tracking, execution tracing, and Scout analysis"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -38,6 +38,7 @@ dev = [
     "pre-commit>=4.0",
     "codespell>=2.4",
     "openai>=2.29.0",
+    "inspect-scout>=0.4.21",
 ]
 
 [project.urls]

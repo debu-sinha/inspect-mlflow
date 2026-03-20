@@ -15,7 +15,9 @@ Install and use:
     inspect eval my_task.py
 """
 
-__version__ = "0.1.2"
+__version__ = "0.2.0"
+
+import contextlib
 
 from inspect_mlflow.tracing import MlflowTracingHooks
 from inspect_mlflow.tracking import MlflowTrackingHooks
@@ -23,4 +25,8 @@ from inspect_mlflow.tracking import MlflowTrackingHooks
 __all__ = [
     "MlflowTracingHooks",
     "MlflowTrackingHooks",
+    "import_mlflow_traces",
 ]
+
+with contextlib.suppress(ImportError):
+    from inspect_mlflow.scout import import_mlflow_traces

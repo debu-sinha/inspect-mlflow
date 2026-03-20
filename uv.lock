@@ -1476,7 +1476,7 @@ wheels = [
 
 [[package]]
 name = "inspect-mlflow"
-version = "0.1.0"
+version = "0.1.2"
 source = { editable = "." }
 dependencies = [
     { name = "inspect-ai" },
@@ -1492,6 +1492,7 @@ scout = [
 dev = [
     { name = "anyio" },
     { name = "codespell" },
+    { name = "inspect-scout" },
     { name = "mypy" },
     { name = "openai" },
     { name = "pre-commit" },
@@ -1513,6 +1514,7 @@ provides-extras = ["scout"]
 dev = [
     { name = "anyio", specifier = ">=4.0" },
     { name = "codespell", specifier = ">=2.4" },
+    { name = "inspect-scout", specifier = ">=0.4.21" },
     { name = "mypy", specifier = ">=1.10" },
     { name = "openai", specifier = ">=2.29.0" },
     { name = "pre-commit", specifier = ">=4.0" },
