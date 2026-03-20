@@ -1,0 +1,48 @@
+name: API Compatibility
+
+on:
+  schedule:
+    - cron: "0 0 * * 0" # Sunday midnight UTC
+  workflow_dispatch:
+
+jobs:
+  test-latest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Install with latest deps
+        run: |
+          uv sync --group dev
+          uv pip install --upgrade inspect-ai mlflow
+      - name: Run tests
+        run: uv run pytest tests/ -v --tb=short
+      - name: Report versions
+        if: always()
+        run: |
+          echo "inspect-ai: $(uv run python -c 'import inspect_ai; print(inspect_ai.__version__)')"
+          echo "mlflow: $(uv run python -c 'import mlflow; print(mlflow.__version__)')"
+
+      - name: Create issue on failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = `API compatibility failure: ${new Date().toISOString().slice(0, 10)}`;
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'api-compat',
+            });
+            if (existing.data.length === 0) {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body: `Tests failed against latest inspect-ai and mlflow.\n\nSee: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+                labels: ['bug', 'api-compat'],
+              });
+            }
