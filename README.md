@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/images/logo.png" alt="inspect-mlflow" width="500">
+  <img src="https://raw.githubusercontent.com/debu-sinha/inspect-mlflow/main/docs/images/logo.png" alt="inspect-mlflow" width="500">
 </p>
 
 <p align="center">
