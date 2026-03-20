@@ -1476,7 +1476,7 @@ wheels = [
 
 [[package]]
 name = "inspect-mlflow"
-version = "0.1.2"
+version = "0.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "inspect-ai" },

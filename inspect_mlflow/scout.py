@@ -25,10 +25,7 @@ import mlflow
 from inspect_ai.event._model import ModelEvent
 from inspect_ai.event._score import ScoreEvent
 from inspect_ai.event._tool import ToolEvent
-from inspect_ai.model._chat_message import (
-    ChatMessageAssistant,
-    ChatMessageUser,
-)
+from inspect_ai.model._chat_message import ChatMessageAssistant
 from inspect_ai.model._model_output import ModelUsage
 from inspect_scout import Transcript
 
@@ -172,12 +169,12 @@ def _get_attr(span: Any, key: str) -> Any:
 
 
 def _extract_llm_messages(span: Any, messages: list[Any]) -> None:
-    """Extract user/assistant messages from an LLM span's inputs/outputs."""
-    if span.inputs:
-        model_input = span.inputs.get("model") or span.inputs.get("messages")
-        if isinstance(model_input, str) and model_input:
-            messages.append(ChatMessageUser(content=model_input, role="user"))
+    """Extract assistant response messages from an LLM span's outputs.
 
+    Note: LLM span inputs contain metadata (model name, message count),
+    not the actual user message text. Only the assistant response is
+    available in the span outputs.
+    """
     if span.outputs:
         response = span.outputs.get("response")
         if isinstance(response, str) and response:

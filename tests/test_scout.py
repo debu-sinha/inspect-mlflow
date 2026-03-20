@@ -75,7 +75,7 @@ def test_trace_to_transcript_with_llm_spans():
     assert transcript.model == "openai/gpt-4o-mini"
     assert transcript.total_tokens == 23
     assert transcript.total_time == 1.0  # (2e9 - 1e9) / 1e9
-    assert len(transcript.messages) == 2  # user + assistant
+    assert len(transcript.messages) == 1  # assistant response only
     assert len(transcript.events) == 1  # ModelEvent
     assert transcript.metadata["run_id"] == "run-123"
 
