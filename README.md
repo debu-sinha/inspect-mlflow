@@ -193,7 +193,7 @@ uv run pre-commit install
 uv run pytest tests/ -v
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for integration testing and PR guidelines.
+See [CONTRIBUTING.md](https://github.com/debu-sinha/inspect-mlflow/blob/main/CONTRIBUTING.md) for integration testing and PR guidelines.
 
 ## Related
 
