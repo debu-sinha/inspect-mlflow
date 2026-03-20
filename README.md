@@ -17,7 +17,7 @@ pip install inspect-mlflow
 
 ## Quick Start
 
-No code changes needed. Hooks auto-register via entry points when the package is installed. Set env vars and run evals as usual.
+Hooks auto-register via entry points when the package is installed. No code changes needed.
 
 ```bash
 # Start MLflow server
@@ -27,7 +27,7 @@ mlflow server --port 5000
 export MLFLOW_TRACKING_URI="http://localhost:5000"
 export MLFLOW_INSPECT_TRACING="true"
 
-# Run evals. Hooks auto-activate.
+# Run evals as usual. Both hooks activate automatically.
 inspect eval my_task.py --model openai/gpt-4o
 ```
 
@@ -35,50 +35,68 @@ Then open http://localhost:5000 to see runs and traces.
 
 ## What it does
 
+This package provides two hooks that run automatically during Inspect AI evaluations.
+
 ### Tracking Hook
 
-Activated when `MLFLOW_TRACKING_URI` is set. Creates hierarchical MLflow runs mirroring the eval structure.
+Activated when `MLFLOW_TRACKING_URI` is set. Creates hierarchical MLflow runs with full evaluation telemetry.
 
-- Parent run per eval invocation, nested child runs per task
-- Task config logged as parameters (model, dataset, solver, temperature)
-- Per-sample scores as step metrics
-- Model token usage (input/output/total per model)
-- Real-time event counting (model calls, tool calls)
+**What gets logged:**
+
+- Parent run per eval invocation with nested child runs per task
+- Task configuration as parameters (model, dataset, solver, temperature, top_p, max_tokens)
+- Per-sample scores as step metrics (accuracy, timing per sample)
+- Aggregate metrics (total_samples, completed_samples, match/accuracy, match/stderr)
+- Model token usage (input/output/total tokens per model)
+- Real-time event counting (total_model_calls, total_tool_calls)
 - Eval artifacts: per-sample results JSON + full eval log JSON
+
+**Task run showing 17 metrics and parameters from a tool-using eval:**
+
+![Task run detail](docs/images/screenshot-02-task-run.png)
 
 ### Tracing Hook
 
-Activated when `MLFLOW_INSPECT_TRACING=true` is also set. Maps eval execution to MLflow trace spans.
+Activated when `MLFLOW_INSPECT_TRACING=true` is also set. Maps eval execution to MLflow trace spans, giving you a visual debugging view of every model call, tool invocation, and scoring step.
+
+**Span hierarchy:**
 
 ```
-eval_run:6fvmKSZv (CHAIN)
+eval_run:98h4b4KN (CHAIN)
   task:task (CHAIN)
-    sample:gM9UtEAM (CHAIN)
-      solvers -> generate -> model:openai/gpt-4o-mini (LLM)
-      scorers -> match -> score (EVALUATOR)
-    sample:628Qbuhr (CHAIN)
+    sample:keAdeL1U (CHAIN)
+      solvers (from SpanBeginEvent)
+        use_tools (solver span)
+          model:openai/gpt-4o-mini (LLM) - 5,167 tokens
+          tool:calculator (TOOL) - args: {"expression": "47 * 89"}, result: "4183"
+          model:openai/gpt-4o-mini (LLM) - 5,263 tokens
+        generate (solver span)
+          model:openai/gpt-4o-mini (LLM) - 182 tokens
+      scorers (from SpanBeginEvent)
+        match (scorer span)
+          score (EVALUATOR) - value: C
+    sample:HWl2wp2B (CHAIN)
       ...
 ```
 
-Each span captures relevant data:
+**Each span type captures different data:**
 
-| Span Type | Data |
+| Span Type | Data Captured |
 |-----------|------|
-| LLM | model name, token counts, temperature, cache, response |
-| TOOL | function name, arguments, result, errors |
+| CHAIN | eval run, task, and sample lifecycle with scores and timing |
+| LLM | model name, input/output token counts, temperature, cache status, response text |
+| TOOL | function name, arguments, result, working time, errors |
 | EVALUATOR | score value, explanation, target |
 
-## Screenshots
+**Traces list showing 3 eval runs (simple math + tool-using calculator eval):**
 
-**Traces list** showing an eval run with execution time and status:
+![Traces list](docs/images/screenshot-04-traces-list.png)
 
-![Traces list](docs/images/inspect-tracing-01-traces-list.png)
-
-**Full span tree** showing the eval hierarchy (eval_run -> task -> samples -> solvers/scorers):
+**Full span tree showing solver/scorer hierarchy with tool calls:**
 
 ![Span tree](docs/images/inspect-tracing-04-timeline.png)
 
-**LLM span detail** with model name, token counts, and response text:
+**LLM span detail with model name, token counts, and response:**
 
 ![LLM detail](docs/images/inspect-tracing-05-model-expanded.png)
 
@@ -89,9 +107,11 @@ Each span captures relevant data:
 | `MLFLOW_TRACKING_URI` | Yes | - | MLflow server URL |
 | `MLFLOW_EXPERIMENT_NAME` | No | `inspect_ai` | Experiment name |
 | `MLFLOW_INSPECT_TRACING` | No | `false` | Enable execution tracing |
-| `MLFLOW_INSPECT_LOG_ARTIFACTS` | No | `true` | Log eval artifacts |
+| `MLFLOW_INSPECT_LOG_ARTIFACTS` | No | `true` | Log eval artifacts (sample results + eval log JSON) |
 
-## Example
+## Examples
+
+### Basic eval (tracking + tracing)
 
 ```python
 from inspect_ai import Task, eval
@@ -112,7 +132,53 @@ task = Task(
 )
 
 logs = eval(task, model="openai/gpt-4o-mini")
-# Results are now in MLflow: runs with metrics + traces with spans
+# MLflow now has: runs with metrics + traces with span tree
+```
+
+### Eval with tool calls
+
+```python
+from inspect_ai import Task, eval
+from inspect_ai.dataset import Sample
+from inspect_ai.scorer import match
+from inspect_ai.solver import generate, use_tools
+from inspect_ai.tool import tool
+
+
+@tool
+def calculator():
+    """Perform arithmetic calculations."""
+
+    async def run(expression: str) -> str:
+        """Evaluate a math expression.
+
+        Args:
+            expression: A math expression to evaluate, e.g. "47 * 89"
+        """
+        allowed = {"__builtins__": {}}
+        return str(eval(expression, allowed))
+
+    return run
+
+
+task = Task(
+    dataset=[
+        Sample(
+            input="Use the calculator to compute 47 * 89.",
+            target="4183",
+        ),
+        Sample(
+            input="Use the calculator to compute 1024 / 16.",
+            target="64",
+        ),
+    ],
+    solver=[use_tools([calculator()]), generate()],
+    scorer=match(),
+)
+
+logs = eval(task, model="openai/gpt-4o-mini")
+# Traces now include TOOL spans for each calculator() call
+# with function name, arguments, and result
 ```
 
 ## Development
@@ -125,11 +191,11 @@ uv run pre-commit install
 uv run pytest tests/ -v
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for integration testing and PR guidelines.
 
 ## Related
 
-- [Inspect AI](https://inspect.aisi.org.uk/) - AI evaluation framework by UK AISI
+- [Inspect AI](https://inspect.aisi.org.uk/) - AI evaluation framework by UK AI Security Institute
 - [MLflow](https://mlflow.org/) - ML experiment tracking and model management
 - [Inspect AI hooks docs](https://inspect.aisi.org.uk/extensions.html#sec-hooks) - How hooks work
 - [Issue #3547](https://github.com/UKGovernmentBEIS/inspect_ai/issues/3547) - Original proposal
