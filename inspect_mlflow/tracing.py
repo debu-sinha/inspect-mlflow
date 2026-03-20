@@ -81,7 +81,7 @@ class MlflowTracingHooks(Hooks):
                 inputs={"task_names": data.task_names},
                 attributes={
                     "inspect.run_id": data.run_id,
-                    "inspect.task_count": len(data.task_names),
+                    "inspect.task_count": str(len(data.task_names)),
                 },
             )
             self._run_spans[data.run_id] = span
