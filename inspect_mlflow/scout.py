@@ -54,7 +54,7 @@ async def import_mlflow_traces(
     if tracking_uri:
         mlflow.set_tracking_uri(tracking_uri)
 
-    exp_name = experiment_name or os.getenv("MLFLOW_EXPERIMENT_NAME", "inspect_ai")
+    exp_name: str = experiment_name or os.getenv("MLFLOW_EXPERIMENT_NAME") or "inspect_ai"
     experiment = mlflow.get_experiment_by_name(exp_name)
     if experiment is None:
         _logger.warning("Experiment '%s' not found", exp_name)
@@ -228,7 +228,7 @@ def _span_to_tool_event(span: Any) -> ToolEvent | None:
             id=span.span_id,
             function=str(function),
             arguments=arguments if isinstance(arguments, dict) else {},
-            result=str(result) if result else None,
+            result=str(result) if result else "",
             working_time=float(working_time) if working_time is not None else None,
         )
     except Exception:
@@ -248,7 +248,7 @@ def _span_to_score_event(span: Any) -> ScoreEvent | None:
         target = inputs.get("target")
 
         return ScoreEvent(
-            score=Score(value=value, explanation=explanation),
+            score=Score(value=value if value is not None else "", explanation=explanation),
             target=str(target) if target else None,
         )
     except Exception:
