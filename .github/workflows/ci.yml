@@ -23,8 +23,7 @@ jobs:
         with:
           enable-cache: true
       - run: uv sync --group dev
-      - run: uv run ruff check .
-      - run: uv run ruff format --check .
+      - run: uv run pre-commit run --all-files
       - run: uv run mypy inspect_mlflow/
 
   test:
