@@ -71,7 +71,7 @@ async def run():
             print(f"  Tokens: {{info.total_tokens}}")
             print(f"  Score: {{info.score}}")
 
-            tc = TranscriptContent(messages=True, events=True, timeline=False)
+            tc = TranscriptContent(messages="all", events="all", timeline=None)
             t = await db.read(info, tc)
             print(f"  Read back messages: {{len(t.messages)}}")
             for msg in t.messages:
