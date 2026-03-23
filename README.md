@@ -58,6 +58,10 @@ Activated when `MLFLOW_TRACKING_URI` is set. Creates hierarchical MLflow runs wi
 
 ![Task run detail](https://raw.githubusercontent.com/debu-sinha/inspect-mlflow/main/docs/images/screenshot-02-task-run.png)
 
+**Traces table with assessment column showing eval scores (match: AVG 1.0):**
+
+![Trace assessments](https://raw.githubusercontent.com/debu-sinha/inspect-mlflow/main/docs/images/screenshot-assessments.png)
+
 ### Tracing Hook
 
 Activated when `MLFLOW_INSPECT_TRACING=true` is also set. Maps eval execution to MLflow trace spans, giving you a visual debugging view of every model call, tool invocation, and scoring step.
