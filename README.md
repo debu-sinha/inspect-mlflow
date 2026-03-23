@@ -203,6 +203,7 @@ See [CONTRIBUTING.md](https://github.com/debu-sinha/inspect-mlflow/blob/main/CON
 
 ## Related
 
+- [Documentation](https://inspect-mlflow.readthedocs.io/) - Full API reference and usage guide
 - [Inspect AI](https://inspect.aisi.org.uk/) - AI evaluation framework by UK AI Security Institute
 - [MLflow](https://mlflow.org/) - ML experiment tracking and model management
 - [Inspect AI hooks docs](https://inspect.aisi.org.uk/extensions.html#sec-hooks) - How hooks work
