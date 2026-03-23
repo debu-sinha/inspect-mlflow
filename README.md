@@ -52,6 +52,7 @@ Activated when `MLFLOW_TRACKING_URI` is set. Creates hierarchical MLflow runs wi
 - Model token usage (input/output/total tokens per model)
 - Real-time event counting (total_model_calls, total_tool_calls)
 - Eval artifacts: per-sample results JSON + full eval log JSON
+- Trace assessments: eval scores logged as MLflow assessments via `mlflow.log_feedback()`, visible in the Traces UI assessment column
 
 **Task run showing 17 metrics and parameters from a tool-using eval:**
 
