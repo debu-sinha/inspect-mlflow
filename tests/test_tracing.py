@@ -318,6 +318,104 @@ async def test_sample_end_logs_scores_and_output(tracing_env):
 
 
 @pytest.mark.anyio
+async def test_sample_end_logs_score_assessments(tracing_env):
+    hook = MlflowTracingHooks()
+    run_span = MagicMock()
+    task_span = MagicMock()
+    sample_span = MagicMock()
+    sample_span.trace_id = "tr-test-123"
+    spec = _make_eval_spec()
+
+    with patch.object(_tracing_mod, "mlflow") as mock_mlflow:
+        mock_mlflow.start_span_no_context.side_effect = [run_span, task_span, sample_span]
+
+        await hook.on_run_start(RunStart(eval_set_id=None, run_id="run-001", task_names=["t"]))
+        await hook.on_task_start(
+            TaskStart(eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
+        )
+        await hook.on_sample_start(
+            SampleStart(
+                eval_set_id=None,
+                run_id="run-001",
+                eval_id="eval-001",
+                sample_id="sample-001",
+                summary=MagicMock(),
+            )
+        )
+
+        sample = _make_sample(
+            scores={"accuracy": Score(value=1.0, explanation="Correct answer")},
+            total_time=2.0,
+        )
+        await hook.on_sample_end(
+            SampleEnd(
+                eval_set_id=None,
+                run_id="run-001",
+                eval_id="eval-001",
+                sample_id="sample-001",
+                sample=sample,
+            )
+        )
+
+        mock_mlflow.log_feedback.assert_called_once()
+        feedback_kwargs = mock_mlflow.log_feedback.call_args.kwargs
+        assert feedback_kwargs["trace_id"] == "tr-test-123"
+        assert feedback_kwargs["name"] == "inspect/accuracy"
+        assert feedback_kwargs["value"] == 1.0
+        assert feedback_kwargs["rationale"] == "Correct answer"
+        assert feedback_kwargs["metadata"]["sample_id"] == "sample-001"
+
+
+@pytest.mark.anyio
+async def test_sample_end_logs_multiple_score_assessments(tracing_env):
+    hook = MlflowTracingHooks()
+    run_span = MagicMock()
+    task_span = MagicMock()
+    sample_span = MagicMock()
+    sample_span.trace_id = "tr-multi-scores"
+    spec = _make_eval_spec()
+
+    with patch.object(_tracing_mod, "mlflow") as mock_mlflow:
+        mock_mlflow.start_span_no_context.side_effect = [run_span, task_span, sample_span]
+
+        await hook.on_run_start(RunStart(eval_set_id=None, run_id="run-001", task_names=["t"]))
+        await hook.on_task_start(
+            TaskStart(eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
+        )
+        await hook.on_sample_start(
+            SampleStart(
+                eval_set_id=None,
+                run_id="run-001",
+                eval_id="eval-001",
+                sample_id="s-002",
+                summary=MagicMock(),
+            )
+        )
+
+        sample = _make_sample(
+            scores={
+                "accuracy": Score(value="C"),
+                "relevance": Score(value=0.85),
+            },
+        )
+        await hook.on_sample_end(
+            SampleEnd(
+                eval_set_id=None,
+                run_id="run-001",
+                eval_id="eval-001",
+                sample_id="s-002",
+                sample=sample,
+            )
+        )
+
+        assert mock_mlflow.log_feedback.call_count == 2
+        calls = mock_mlflow.log_feedback.call_args_list
+        names = {c.kwargs["name"] for c in calls}
+        assert "inspect/accuracy" in names
+        assert "inspect/relevance" in names
+
+
+@pytest.mark.anyio
 async def test_model_event_creates_llm_span(tracing_env):
     from inspect_ai.event._model import ModelEvent
     from inspect_ai.model._generate_config import GenerateConfig

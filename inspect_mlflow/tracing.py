@@ -38,8 +38,9 @@ from inspect_ai.hooks import (
     TaskStart,
     hooks,
 )
+from mlflow.entities.assessment_source import AssessmentSource
 
-from inspect_mlflow.util import truncate
+from inspect_mlflow.util import score_to_numeric, truncate
 
 _logger = logging.getLogger(__name__)
 
@@ -197,8 +198,31 @@ class MlflowTracingHooks(Hooks):
                 span.record_exception(str(sample.error))
 
             span.end(outputs=outputs, status=status)
+
+            # Log scores as MLflow trace assessments
+            if sample.scores:
+                self._log_score_assessments(span.trace_id, data.sample_id, sample.scores)
         except Exception:
             _logger.debug("Failed to end sample span", exc_info=True)
+
+    def _log_score_assessments(self, trace_id: str, sample_id: str, scores: dict[str, Any]) -> None:
+        """Log Inspect AI eval scores as MLflow trace assessments."""
+        for scorer_name, score in scores.items():
+            try:
+                numeric = score_to_numeric(score.value)
+                mlflow.log_feedback(
+                    trace_id=trace_id,
+                    name=f"inspect/{scorer_name}",
+                    value=numeric if numeric is not None else str(score.value),
+                    source=AssessmentSource(
+                        source_type="CODE",
+                        source_id="inspect_ai",
+                    ),
+                    rationale=getattr(score, "explanation", None),
+                    metadata={"sample_id": sample_id},
+                )
+            except Exception:
+                _logger.debug("Failed to log assessment for %s", scorer_name, exc_info=True)
 
     async def on_sample_event(self, data: SampleEvent) -> None:
         sample_span = self._sample_spans.get(data.sample_id)
