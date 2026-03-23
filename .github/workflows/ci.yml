@@ -23,7 +23,7 @@ jobs:
         with:
           enable-cache: true
       - run: uv sync --group dev
-      - run: uv run pre-commit run --all-files
+      - run: SKIP=no-commit-to-branch uv run pre-commit run --all-files
       - run: uv run mypy inspect_mlflow/
 
   test:
