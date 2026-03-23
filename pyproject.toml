@@ -1,6 +1,6 @@
 [project]
 name = "inspect-mlflow"
-version = "0.3.1"
+dynamic = ["version"]
 description = "MLflow integration for Inspect AI: experiment tracking, execution tracing, and Scout analysis"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -49,6 +49,9 @@ Repository = "https://github.com/debu-sinha/inspect-mlflow"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "inspect_mlflow/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["inspect_mlflow"]

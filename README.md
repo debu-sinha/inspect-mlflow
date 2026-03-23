@@ -8,6 +8,7 @@
 [![Downloads](https://img.shields.io/pypi/dm/inspect-mlflow.svg)](https://pypi.org/project/inspect-mlflow/)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
+[![Docs](https://readthedocs.org/projects/inspect-mlflow/badge/?version=latest)](https://inspect-mlflow.readthedocs.io/)
 
 MLflow integration for [Inspect AI](https://inspect.aisi.org.uk/). Provides experiment tracking, execution tracing, and artifact logging for Inspect AI evaluations.
 
