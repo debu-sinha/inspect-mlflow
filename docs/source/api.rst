@@ -17,6 +17,10 @@ API Reference
    :members:
    :undoc-members:
 
+.. automodule:: inspect_mlflow.config
+   :members:
+   :undoc-members:
+
 .. automodule:: inspect_mlflow.util
    :members:
    :undoc-members:

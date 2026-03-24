@@ -4,6 +4,8 @@ Tracking Hook
 Activated when ``MLFLOW_TRACKING_URI`` is set.
 
 The tracking hook creates hierarchical MLflow runs mirroring the evaluation structure.
+Uses ``MlflowClient`` API for full isolation from user MLflow state. Thread-safe
+for concurrent sample processing.
 
 Features
 --------
@@ -15,6 +17,8 @@ Features
 - Real-time event counting (model calls, tool calls)
 - Eval artifacts: per-sample results JSON + full eval log JSON
 - Trace assessments: eval scores logged via ``mlflow.log_feedback()``
+- Async logging for reduced hook latency
+- Thread-safe counters for concurrent samples
 
 Configuration
 -------------
@@ -38,6 +42,10 @@ Configuration
      - No
      - ``true``
      - Log eval artifacts
+   * - ``INSPECT_MLFLOW_LOG_ARTIFACTS``
+     - No
+     - ``true``
+     - Same as above (new prefix, takes priority)
 
 API Reference
 -------------
