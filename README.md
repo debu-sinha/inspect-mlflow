@@ -39,7 +39,7 @@ Then open http://localhost:5000 to see runs and traces.
 
 ## What it does
 
-This package provides two hooks that run automatically during Inspect AI evaluations.
+This package provides two hooks that run automatically during Inspect AI evaluations. Both hooks use the `MlflowClient` API for full isolation from user MLflow state (no global `mlflow.start_run` calls). Thread-safe for concurrent sample processing.
 
 ### Tracking Hook
 
