@@ -3,7 +3,7 @@ name = "inspect-mlflow"
 dynamic = ["version"]
 description = "MLflow integration for Inspect AI: experiment tracking, execution tracing, and Scout analysis"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 license = "MIT"
 authors = [
     { name = "Debu Sinha", email = "debusinha2009@gmail.com" },
@@ -14,6 +14,7 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
@@ -81,7 +82,7 @@ exclude_lines = [
 
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W", "B", "C4", "UP", "SIM", "PIE", "RUF"]
@@ -90,7 +91,7 @@ select = ["E", "F", "I", "W", "B", "C4", "UP", "SIM", "PIE", "RUF"]
 docstring-code-format = true
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.10"
 warn_return_any = true
 warn_unused_configs = true
 check_untyped_defs = true
