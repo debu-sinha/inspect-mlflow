@@ -14,6 +14,7 @@ import json
 import logging
 import os
 import tempfile
+import threading
 from typing import Any
 
 import mlflow
@@ -32,6 +33,7 @@ from inspect_ai.hooks import (
 )
 from inspect_ai.log import EvalSpec
 
+from inspect_mlflow.config import MLflowSettings, load_settings
 from inspect_mlflow.util import safe_log_params, score_to_numeric, truncate
 
 _logger = logging.getLogger(__name__)
@@ -53,13 +55,21 @@ class MlflowTrackingHooks(Hooks):
         self._sample_counts: dict[str, int] = {}
         self._model_usage: dict[str, dict[str, float]] = {}
         self._event_counts: dict[str, dict[str, int]] = {}
+        self._lock = threading.Lock()
+        self._settings: MLflowSettings | None = None
+
+    @property
+    def settings(self) -> MLflowSettings:
+        if self._settings is None:
+            self._settings = load_settings()
+        return self._settings
 
     def enabled(self) -> bool:
-        return os.getenv("MLFLOW_TRACKING_URI") is not None
+        return load_settings().tracking_uri is not None
 
     async def on_run_start(self, data: RunStart) -> None:
-        experiment_name = os.getenv("MLFLOW_EXPERIMENT_NAME", "inspect_ai")
-        mlflow.set_experiment(experiment_name)
+        self._settings = load_settings()
+        mlflow.set_experiment(self.settings.experiment_name)
 
         self._parent_run = mlflow.start_run(
             run_name=f"inspect-{data.run_id[:8]}",
@@ -178,7 +188,7 @@ class MlflowTrackingHooks(Hooks):
             except Exception:
                 pass
 
-        if os.getenv("MLFLOW_INSPECT_LOG_ARTIFACTS", "true").lower() != "false":
+        if self.settings.log_artifacts:
             self._log_eval_artifacts(log)
 
         status = "FINISHED" if log.status == "success" else "FAILED"

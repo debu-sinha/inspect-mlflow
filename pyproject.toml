@@ -26,6 +26,7 @@ dependencies = [
 
 [project.optional-dependencies]
 scout = ["inspect-scout>=0.1.0"]
+config = ["pydantic>=2.0", "pydantic-settings>=2.0"]
 
 [dependency-groups]
 dev = [
@@ -95,5 +96,5 @@ warn_unused_configs = true
 check_untyped_defs = true
 
 [[tool.mypy.overrides]]
-module = ["inspect_ai.*", "mlflow.*"]
+module = ["inspect_ai.*", "mlflow.*", "pydantic_settings.*"]
 ignore_missing_imports = true

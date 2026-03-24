@@ -19,7 +19,7 @@ MLFLOW_INSPECT_TRACING="true" are set.
 from __future__ import annotations
 
 import logging
-import os
+import threading
 from typing import Any
 
 import mlflow
@@ -40,6 +40,7 @@ from inspect_ai.hooks import (
 )
 from mlflow.entities.assessment_source import AssessmentSource
 
+from inspect_mlflow.config import MLflowSettings, load_settings
 from inspect_mlflow.util import score_to_numeric, truncate
 
 _logger = logging.getLogger(__name__)
@@ -55,20 +56,26 @@ class MlflowTracingHooks(Hooks):
     """
 
     def __init__(self) -> None:
-        self._run_spans: dict[str, Any] = {}  # run_id -> LiveSpan
-        self._task_spans: dict[str, Any] = {}  # eval_id -> LiveSpan
-        self._sample_spans: dict[str, Any] = {}  # sample_id -> LiveSpan
-        self._inspect_spans: dict[str, Any] = {}  # inspect span_id -> LiveSpan
+        self._run_spans: dict[str, Any] = {}
+        self._task_spans: dict[str, Any] = {}
+        self._sample_spans: dict[str, Any] = {}
+        self._inspect_spans: dict[str, Any] = {}
+        self._lock = threading.Lock()
+        self._settings: MLflowSettings | None = None
+
+    @property
+    def settings(self) -> MLflowSettings:
+        if self._settings is None:
+            self._settings = load_settings()
+        return self._settings
 
     def enabled(self) -> bool:
-        return (
-            os.getenv("MLFLOW_TRACKING_URI") is not None
-            and os.getenv("MLFLOW_INSPECT_TRACING", "").lower() == "true"
-        )
+        s = load_settings()
+        return s.tracking_uri is not None and s.tracing_enabled
 
     async def on_run_start(self, data: RunStart) -> None:
-        experiment_name = os.getenv("MLFLOW_EXPERIMENT_NAME", "inspect_ai")
-        mlflow.set_experiment(experiment_name)
+        self._settings = load_settings()
+        mlflow.set_experiment(self.settings.experiment_name)
 
         try:
             span = mlflow.start_span_no_context(
