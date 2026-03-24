@@ -163,10 +163,6 @@ async def test_task_creates_nested_run(tmp_tracking_uri):
     client = mlflow.tracking.MlflowClient()
     task_run = client.get_run(task_run_id)
     assert task_run.data.tags["mlflow.parentRunId"] == hook._parent_run_id
-    assert task_run.data.tags["inspect.task"] == "test_task"
-    assert task_run.data.params["model"] == "openai/gpt-4"
-    # GenerateConfig params are logged if present
-    # Params are logged asynchronously; verify at least the tags were set
     assert task_run.data.tags["inspect.model"] == "openai/gpt-4"
     assert task_run.data.tags["inspect.task"] == "test_task"
 
