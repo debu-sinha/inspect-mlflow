@@ -4,6 +4,9 @@ Logs evaluation runs, task configurations, sample scores, and model usage
 to an MLflow tracking server. Creates a parent run per eval run with nested
 child runs per task.
 
+Uses MlflowClient API to avoid contaminating global mlflow state, so user
+code that calls mlflow.start_run() independently will not conflict.
+
 Activated automatically when MLFLOW_TRACKING_URI is set.
 """
 
@@ -32,25 +35,39 @@ from inspect_ai.hooks import (
     hooks,
 )
 from inspect_ai.log import EvalSpec
+from mlflow.tracking import MlflowClient
 
 from inspect_mlflow.config import MLflowSettings, load_settings
-from inspect_mlflow.util import safe_log_params, score_to_numeric, truncate
+from inspect_mlflow.util import score_to_numeric, truncate
 
 _logger = logging.getLogger(__name__)
+
+
+def _safe_log_param(client: MlflowClient, run_id: str, key: str, value: Any) -> None:
+    str_val = str(value)
+    if len(str_val) > 500:
+        str_val = str_val[:497] + "..."
+    with contextlib.suppress(Exception):
+        client.log_param(run_id, key, str_val)
+
+
+def _safe_log_params(client: MlflowClient, run_id: str, params: dict[str, Any]) -> None:
+    for key, value in params.items():
+        _safe_log_param(client, run_id, key, value)
 
 
 @hooks(name="mlflow_tracking", description="MLflow Tracking")
 class MlflowTrackingHooks(Hooks):
     """Tracks Inspect AI evaluations in MLflow with hierarchical runs.
 
-    One parent run per eval invocation, with nested child runs per task.
-    Logs task configuration as parameters, per-sample scores as metrics,
-    and model token usage.
+    Uses MlflowClient API for isolation from user mlflow state.
     """
 
     def __init__(self) -> None:
-        self._parent_run: mlflow.ActiveRun | None = None
-        self._task_runs: dict[str, mlflow.ActiveRun] = {}
+        self._client: MlflowClient | None = None
+        self._experiment_id: str | None = None
+        self._parent_run_id: str | None = None
+        self._task_run_ids: dict[str, str] = {}
         self._tasks: dict[str, EvalSpec] = {}
         self._sample_counts: dict[str, int] = {}
         self._model_usage: dict[str, dict[str, float]] = {}
@@ -64,14 +81,33 @@ class MlflowTrackingHooks(Hooks):
             self._settings = load_settings()
         return self._settings
 
+    @property
+    def client(self) -> MlflowClient:
+        if self._client is None:
+            self._client = MlflowClient()
+        return self._client
+
     def enabled(self) -> bool:
         return load_settings().tracking_uri is not None
 
     async def on_run_start(self, data: RunStart) -> None:
         self._settings = load_settings()
-        mlflow.set_experiment(self.settings.experiment_name)
+        self._client = MlflowClient()
 
-        self._parent_run = mlflow.start_run(
+        experiment = self._client.get_experiment_by_name(self.settings.experiment_name)
+        if experiment is None:
+            self._experiment_id = self._client.create_experiment(self.settings.experiment_name)
+        else:
+            self._experiment_id = experiment.experiment_id
+
+        # Enable async logging for reduced hook latency
+        try:
+            mlflow.config.enable_async_logging(True)
+        except Exception:
+            pass
+
+        run = self._client.create_run(
+            experiment_id=self._experiment_id,
             run_name=f"inspect-{data.run_id[:8]}",
             tags={
                 "inspect.run_id": data.run_id,
@@ -79,17 +115,26 @@ class MlflowTrackingHooks(Hooks):
                 "inspect.tasks": ", ".join(data.task_names),
             },
         )
+        self._parent_run_id = run.info.run_id
+        _logger.debug("Started parent run %s", self._parent_run_id)
 
     async def on_run_end(self, data: RunEnd) -> None:
-        for eval_id in list(self._task_runs.keys()):
-            mlflow.end_run()
-            self._task_runs.pop(eval_id, None)
+        # End each task run by its specific run_id (not global stack)
+        for eval_id, run_id in list(self._task_run_ids.items()):
+            try:
+                self.client.set_terminated(run_id, status="FAILED")
+            except Exception:
+                _logger.debug("Failed to terminate task run %s", run_id, exc_info=True)
 
-        if self._parent_run:
+        if self._parent_run_id:
             status = "FAILED" if data.exception else "FINISHED"
-            mlflow.end_run(status=status)
-            self._parent_run = None
+            try:
+                self.client.set_terminated(self._parent_run_id, status=status)
+            except Exception:
+                _logger.debug("Failed to terminate parent run", exc_info=True)
+            self._parent_run_id = None
 
+        self._task_run_ids.clear()
         self._tasks.clear()
         self._sample_counts.clear()
         self._model_usage.clear()
@@ -97,25 +142,30 @@ class MlflowTrackingHooks(Hooks):
 
     async def on_task_start(self, data: TaskStart) -> None:
         self._tasks[data.eval_id] = data.spec
-        self._sample_counts[data.eval_id] = 0
+        with self._lock:
+            self._sample_counts[data.eval_id] = 0
 
-        if not self._parent_run:
+        if not self._parent_run_id:
+            _logger.debug("No parent run, skipping task %s", data.spec.task)
             return
 
-        task_run = mlflow.start_run(
+        run = self.client.create_run(
+            experiment_id=self._experiment_id,
             run_name=data.spec.task,
-            nested=True,
             tags={
+                "mlflow.parentRunId": self._parent_run_id,
                 "inspect.eval_id": data.eval_id,
                 "inspect.run_id": data.run_id,
                 "inspect.task": data.spec.task,
                 "inspect.model": data.spec.model,
             },
         )
-        self._task_runs[data.eval_id] = task_run
+        task_run_id = run.info.run_id
+        self._task_run_ids[data.eval_id] = task_run_id
 
-        safe_log_params(
-            mlflow,
+        _safe_log_params(
+            self.client,
+            task_run_id,
             {
                 "task": data.spec.task,
                 "model": data.spec.model,
@@ -127,8 +177,9 @@ class MlflowTrackingHooks(Hooks):
         )
 
         if data.spec.task_args_passed:
-            safe_log_params(
-                mlflow,
+            _safe_log_params(
+                self.client,
+                task_run_id,
                 {f"task_arg.{k}": v for k, v in data.spec.task_args_passed.items()},
             )
 
@@ -141,15 +192,15 @@ class MlflowTrackingHooks(Hooks):
         if config.max_tokens is not None:
             gen_params["max_tokens"] = config.max_tokens
         if gen_params:
-            safe_log_params(mlflow, gen_params)
+            _safe_log_params(self.client, task_run_id, gen_params)
 
         if data.spec.tags:
-            safe_log_params(mlflow, {"tags": ", ".join(data.spec.tags)})
+            _safe_log_param(self.client, task_run_id, "tags", ", ".join(data.spec.tags))
 
     async def on_task_end(self, data: TaskEnd) -> None:
         eval_id = data.eval_id
-        task_run = self._task_runs.get(eval_id)
-        if not task_run:
+        task_run_id = self._task_run_ids.get(eval_id)
+        if not task_run_id:
             return
 
         log = data.log
@@ -161,12 +212,14 @@ class MlflowTrackingHooks(Hooks):
                     metric_key = f"{scorer_name}/{metric_name}"
                     if isinstance(metric.value, (int, float)):
                         with contextlib.suppress(Exception):
-                            mlflow.log_metric(metric_key, float(metric.value))
+                            self.client.log_metric(task_run_id, metric_key, float(metric.value))
 
         if log.results:
             try:
-                mlflow.log_metric("total_samples", log.results.total_samples)
-                mlflow.log_metric("completed_samples", log.results.completed_samples)
+                self.client.log_metric(task_run_id, "total_samples", log.results.total_samples)
+                self.client.log_metric(
+                    task_run_id, "completed_samples", log.results.completed_samples
+                )
             except Exception:
                 pass
 
@@ -174,40 +227,56 @@ class MlflowTrackingHooks(Hooks):
             for model_name, usage in log.stats.model_usage.items():
                 prefix = f"usage/{model_name}"
                 try:
-                    mlflow.log_metric(f"{prefix}/input_tokens", usage.input_tokens)
-                    mlflow.log_metric(f"{prefix}/output_tokens", usage.output_tokens)
-                    mlflow.log_metric(f"{prefix}/total_tokens", usage.total_tokens)
+                    self.client.log_metric(
+                        task_run_id, f"{prefix}/input_tokens", usage.input_tokens
+                    )
+                    self.client.log_metric(
+                        task_run_id, f"{prefix}/output_tokens", usage.output_tokens
+                    )
+                    self.client.log_metric(
+                        task_run_id, f"{prefix}/total_tokens", usage.total_tokens
+                    )
                 except Exception:
                     pass
 
-        event_counts = self._event_counts.get(eval_id, {})
+        with self._lock:
+            event_counts = self._event_counts.get(eval_id, {})
         if event_counts:
             try:
-                mlflow.log_metric("total_model_calls", event_counts.get("model_calls", 0))
-                mlflow.log_metric("total_tool_calls", event_counts.get("tool_calls", 0))
+                self.client.log_metric(
+                    task_run_id, "total_model_calls", event_counts.get("model_calls", 0)
+                )
+                self.client.log_metric(
+                    task_run_id, "total_tool_calls", event_counts.get("tool_calls", 0)
+                )
             except Exception:
                 pass
 
         if self.settings.log_artifacts:
-            self._log_eval_artifacts(log)
+            self._log_eval_artifacts(task_run_id, log)
 
         status = "FINISHED" if log.status == "success" else "FAILED"
-        mlflow.end_run(status=status)
-        self._task_runs.pop(eval_id, None)
-        self._tasks.pop(eval_id, None)
-        self._event_counts.pop(eval_id, None)
-
-    def _log_eval_artifacts(self, log: Any) -> None:
         try:
-            self._log_sample_table(log)
+            self.client.set_terminated(task_run_id, status=status)
+        except Exception:
+            _logger.debug("Failed to terminate task run %s", task_run_id, exc_info=True)
+
+        self._task_run_ids.pop(eval_id, None)
+        self._tasks.pop(eval_id, None)
+        with self._lock:
+            self._event_counts.pop(eval_id, None)
+
+    def _log_eval_artifacts(self, run_id: str, log: Any) -> None:
+        try:
+            self._log_sample_table(run_id, log)
         except Exception:
             _logger.debug("Failed to log sample results artifact", exc_info=True)
         try:
-            self._log_eval_json(log)
+            self._log_eval_json(run_id, log)
         except Exception:
             _logger.debug("Failed to log eval log artifact", exc_info=True)
 
-    def _log_sample_table(self, log: Any) -> None:
+    def _log_sample_table(self, run_id: str, log: Any) -> None:
         if not log.samples:
             return
 
@@ -238,11 +307,11 @@ class MlflowTrackingHooks(Hooks):
         try:
             with os.fdopen(fd, "w") as f:
                 json.dump(rows, f, indent=2, default=str)
-            mlflow.log_artifact(path, artifact_path="sample_results")
+            self.client.log_artifact(run_id, path, artifact_path="sample_results")
         finally:
             os.unlink(path)
 
-    def _log_eval_json(self, log: Any) -> None:
+    def _log_eval_json(self, run_id: str, log: Any) -> None:
         eval_id = log.eval.eval_id if log.eval else "unknown"
         log_data = log.model_dump(mode="json", exclude={"samples"})
 
@@ -250,17 +319,19 @@ class MlflowTrackingHooks(Hooks):
         try:
             with os.fdopen(fd, "w") as f:
                 json.dump(log_data, f, indent=2, default=str)
-            mlflow.log_artifact(path, artifact_path="eval_logs")
+            self.client.log_artifact(run_id, path, artifact_path="eval_logs")
         finally:
             os.unlink(path)
 
     async def on_sample_end(self, data: SampleEnd) -> None:
         eval_id = data.eval_id
-        if eval_id not in self._task_runs:
+        task_run_id = self._task_run_ids.get(eval_id)
+        if not task_run_id:
             return
 
-        sample_idx = self._sample_counts.get(eval_id, 0)
-        self._sample_counts[eval_id] = sample_idx + 1
+        with self._lock:
+            sample_idx = self._sample_counts.get(eval_id, 0)
+            self._sample_counts[eval_id] = sample_idx + 1
 
         sample = data.sample
 
@@ -269,64 +340,82 @@ class MlflowTrackingHooks(Hooks):
                 numeric = score_to_numeric(score.value)
                 if numeric is not None:
                     with contextlib.suppress(Exception):
-                        mlflow.log_metric(f"sample/{scorer_name}", numeric, step=sample_idx)
+                        self.client.log_metric(
+                            task_run_id, f"sample/{scorer_name}", numeric, step=sample_idx
+                        )
 
         if sample.total_time is not None:
             with contextlib.suppress(Exception):
-                mlflow.log_metric("sample/total_time", sample.total_time, step=sample_idx)
+                self.client.log_metric(
+                    task_run_id, "sample/total_time", sample.total_time, step=sample_idx
+                )
 
     async def on_sample_event(self, data: SampleEvent) -> None:
         eval_id = data.eval_id
-        if eval_id not in self._task_runs:
+        task_run_id = self._task_run_ids.get(eval_id)
+        if not task_run_id:
             return
 
-        if eval_id not in self._event_counts:
-            self._event_counts[eval_id] = {"model_calls": 0, "tool_calls": 0}
+        with self._lock:
+            if eval_id not in self._event_counts:
+                self._event_counts[eval_id] = {"model_calls": 0, "tool_calls": 0}
+            counters = self._event_counts[eval_id]
 
         event = data.event
-        counters = self._event_counts[eval_id]
 
         if isinstance(event, ModelEvent):
-            step = counters["model_calls"]
-            counters["model_calls"] += 1
+            with self._lock:
+                step = counters["model_calls"]
+                counters["model_calls"] += 1
             try:
-                mlflow.log_metric("event/model_call", step, step=step)
+                self.client.log_metric(task_run_id, "event/model_call", step, step=step)
                 if event.output and event.output.usage:
                     usage = event.output.usage
-                    mlflow.log_metric("event/input_tokens", usage.input_tokens, step=step)
-                    mlflow.log_metric("event/output_tokens", usage.output_tokens, step=step)
+                    self.client.log_metric(
+                        task_run_id, "event/input_tokens", usage.input_tokens, step=step
+                    )
+                    self.client.log_metric(
+                        task_run_id, "event/output_tokens", usage.output_tokens, step=step
+                    )
                 if event.working_time is not None:
-                    mlflow.log_metric("event/model_time", event.working_time, step=step)
+                    self.client.log_metric(
+                        task_run_id, "event/model_time", event.working_time, step=step
+                    )
             except Exception:
                 pass
 
         elif isinstance(event, ToolEvent):
-            step = counters["tool_calls"]
-            counters["tool_calls"] += 1
+            with self._lock:
+                step = counters["tool_calls"]
+                counters["tool_calls"] += 1
             try:
-                mlflow.log_metric("event/tool_call", step, step=step)
-                mlflow.log_param(f"tool_call.{step}.function", event.function[:500])
+                self.client.log_metric(task_run_id, "event/tool_call", step, step=step)
+                _safe_log_param(
+                    self.client, task_run_id, f"tool_call.{step}.function", event.function[:500]
+                )
                 if event.error:
-                    mlflow.log_metric("event/tool_error", 1, step=step)
+                    self.client.log_metric(task_run_id, "event/tool_error", 1, step=step)
                 if event.working_time is not None:
-                    mlflow.log_metric("event/tool_time", event.working_time, step=step)
+                    self.client.log_metric(
+                        task_run_id, "event/tool_time", event.working_time, step=step
+                    )
             except Exception:
                 pass
 
     async def on_model_usage(self, data: ModelUsageData) -> None:
         model = data.model_name
-        if model not in self._model_usage:
-            self._model_usage[model] = {
-                "calls": 0,
-                "input_tokens": 0,
-                "output_tokens": 0,
-                "total_tokens": 0,
-                "total_duration": 0.0,
-            }
-
-        stats = self._model_usage[model]
-        stats["calls"] += 1
-        stats["input_tokens"] += data.usage.input_tokens
-        stats["output_tokens"] += data.usage.output_tokens
-        stats["total_tokens"] += data.usage.total_tokens
-        stats["total_duration"] += data.call_duration
+        with self._lock:
+            if model not in self._model_usage:
+                self._model_usage[model] = {
+                    "calls": 0,
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                    "total_tokens": 0,
+                    "total_duration": 0.0,
+                }
+            stats = self._model_usage[model]
+            stats["calls"] += 1
+            stats["input_tokens"] += data.usage.input_tokens
+            stats["output_tokens"] += data.usage.output_tokens
+            stats["total_tokens"] += data.usage.total_tokens
+            stats["total_duration"] += data.call_duration
