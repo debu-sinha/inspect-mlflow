@@ -101,10 +101,8 @@ class MlflowTrackingHooks(Hooks):
             self._experiment_id = experiment.experiment_id
 
         # Enable async logging for reduced hook latency
-        try:
+        with contextlib.suppress(Exception):
             mlflow.config.enable_async_logging(True)
-        except Exception:
-            pass
 
         run = self._client.create_run(
             experiment_id=self._experiment_id,
@@ -120,7 +118,7 @@ class MlflowTrackingHooks(Hooks):
 
     async def on_run_end(self, data: RunEnd) -> None:
         # End each task run by its specific run_id (not global stack)
-        for eval_id, run_id in list(self._task_run_ids.items()):
+        for _eval_id, run_id in list(self._task_run_ids.items()):
             try:
                 self.client.set_terminated(run_id, status="FAILED")
             except Exception:
