@@ -11,11 +11,9 @@ from unittest.mock import MagicMock
 import mlflow
 import pytest
 from inspect_ai.hooks._hooks import (
-    ModelUsageData,
     RunEnd,
     RunStart,
     SampleEnd,
-    SampleEvent,
     TaskEnd,
     TaskStart,
 )
@@ -28,10 +26,8 @@ from inspect_ai.log._log import (
     EvalSample,
     EvalScore,
     EvalSpec,
-    EvalStats,
 )
 from inspect_ai.model._generate_config import GenerateConfig
-from inspect_ai.model._model_output import ModelOutput, ModelUsage
 from inspect_ai.scorer._metric import Score
 
 from inspect_mlflow.tracking import MlflowTrackingHooks
@@ -209,8 +205,6 @@ async def test_sample_end_logs_step_metrics(tmp_tracking_uri):
     await hook.on_task_start(
         TaskStart(eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
     )
-
-    task_run_id = hook._task_run_ids["eval-001"]
 
     sample = MagicMock()
     sample.scores = {"match": Score(value="C", explanation="correct")}

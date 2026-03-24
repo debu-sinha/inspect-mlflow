@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import os
+import contextlib
 
 import mlflow
 import pytest
@@ -22,10 +22,8 @@ def tmp_tracking_uri(tmp_path, monkeypatch):
     monkeypatch.setenv("MLFLOW_EXPERIMENT_NAME", "test-experiment")
     mlflow.set_tracking_uri(uri)
     # Disable async logging in tests so writes are visible immediately
-    try:
+    with contextlib.suppress(Exception):
         mlflow.config.enable_async_logging(False)
-    except Exception:
-        pass
     yield uri
     mlflow.set_tracking_uri(None)
 
