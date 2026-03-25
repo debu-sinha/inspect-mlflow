@@ -147,6 +147,7 @@ class MlflowTrackingHooks(Hooks):
             _logger.debug("No parent run, skipping task %s", data.spec.task)
             return
 
+        assert self._experiment_id is not None, "experiment_id not set; on_run_start not called"
         run = self.client.create_run(
             experiment_id=self._experiment_id,
             run_name=data.spec.task,
