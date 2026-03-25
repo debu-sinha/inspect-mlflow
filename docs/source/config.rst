@@ -30,6 +30,17 @@ Both ``MLFLOW_`` and ``INSPECT_MLFLOW_`` prefixes are supported. The
    * - ``INSPECT_MLFLOW_LOG_ARTIFACTS``
      - ``true``
      - Same as above (new prefix, takes priority)
+   * - ``INSPECT_MLFLOW_AUTOLOG_ENABLED``
+     - ``true``
+     - Enable MLflow provider autolog integrations
+   * - ``INSPECT_MLFLOW_AUTOLOG_MODELS``
+     - ``openai,anthropic,langchain,litellm``
+     - CSV or JSON array of providers to autolog
+
+Autolog support map includes ``openai``, ``anthropic``, ``langchain``, ``litellm``,
+``mistral``, ``groq``, ``cohere``, ``gemini``, and ``bedrock``.
+Each provider is enabled only when both the corresponding MLflow flavor module and
+provider SDK are available in the environment.
 
 API Reference
 -------------

@@ -109,6 +109,13 @@ eval_run:98h4b4KN (CHAIN)
 
 ![LLM detail](https://raw.githubusercontent.com/debu-sinha/inspect-mlflow/main/docs/images/inspect-tracing-05-model-expanded.png)
 
+### Autolog
+
+Autolog enables MLflow provider integrations at run start.
+Supported providers are: `openai`, `anthropic`, `langchain`, `litellm`,
+`mistral`, `groq`, `cohere`, `gemini`, `bedrock`.
+Each provider is enabled only when both the MLflow flavor module and provider SDK are installed.
+
 ## Configuration
 
 Configuration is loaded from environment variables. When `pydantic-settings` is installed (`pip install inspect-mlflow[config]`), settings are typed and validated with the `INSPECT_MLFLOW_` prefix. Without it, standard `os.getenv()` is used.
@@ -120,6 +127,8 @@ Configuration is loaded from environment variables. When `pydantic-settings` is 
 | `MLFLOW_INSPECT_TRACING` | No | `false` | Enable execution tracing |
 | `MLFLOW_INSPECT_LOG_ARTIFACTS` | No | `true` | Log eval artifacts |
 | `INSPECT_MLFLOW_LOG_ARTIFACTS` | No | `true` | Same as above (new prefix, takes priority) |
+| `INSPECT_MLFLOW_AUTOLOG_ENABLED` | No | `true` | Enable MLflow provider autolog integrations |
+| `INSPECT_MLFLOW_AUTOLOG_MODELS` | No | `openai,anthropic,langchain,litellm` | CSV or JSON array of providers to autolog |
 
 ## Examples
 
