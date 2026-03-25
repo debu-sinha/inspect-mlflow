@@ -106,7 +106,9 @@ async def test_run_start_enables_autolog_when_enabled(tmp_tracking_uri, monkeypa
     hook = MlflowTrackingHooks()
 
     with patch("inspect_mlflow.tracking.enable_autolog", return_value=True) as mock_enable:
-        await hook.on_run_start(RunStart(eval_set_id=None, run_id="run-auto-1", task_names=["task"]))
+        await hook.on_run_start(
+            RunStart(eval_set_id=None, run_id="run-auto-1", task_names=["task"])
+        )
         mock_enable.assert_called_once_with(["openai", "anthropic"])
         assert hook._autolog_enabled is True
 
@@ -117,7 +119,9 @@ async def test_run_start_skips_autolog_when_disabled(tmp_tracking_uri, monkeypat
     hook = MlflowTrackingHooks()
 
     with patch("inspect_mlflow.tracking.enable_autolog", return_value=True) as mock_enable:
-        await hook.on_run_start(RunStart(eval_set_id=None, run_id="run-auto-2", task_names=["task"]))
+        await hook.on_run_start(
+            RunStart(eval_set_id=None, run_id="run-auto-2", task_names=["task"])
+        )
         mock_enable.assert_not_called()
         assert hook._autolog_enabled is False
 
@@ -131,7 +135,9 @@ async def test_run_end_disables_mlflow_autolog_when_enabled(tmp_tracking_uri, mo
         patch("inspect_mlflow.tracking.enable_autolog", return_value=True),
         patch("inspect_mlflow.tracking.mlflow.autolog") as mock_mlflow_autolog,
     ):
-        await hook.on_run_start(RunStart(eval_set_id=None, run_id="run-auto-3", task_names=["task"]))
+        await hook.on_run_start(
+            RunStart(eval_set_id=None, run_id="run-auto-3", task_names=["task"])
+        )
         assert hook._autolog_enabled is True
         await hook.on_run_end(
             RunEnd(eval_set_id=None, run_id="run-auto-3", exception=None, logs=[])

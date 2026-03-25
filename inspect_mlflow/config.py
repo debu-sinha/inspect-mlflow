@@ -40,6 +40,7 @@ def _parse_autolog_models(value: Any) -> list[str]:
 
     return DEFAULT_AUTOLOG_MODELS.copy()
 
+
 try:
     from pydantic import Field, field_validator
     from pydantic_settings import BaseSettings, NoDecode
@@ -94,9 +95,7 @@ except ImportError:
             self.log_artifacts = _artifacts.lower() != "false"
             _autolog_enabled = os.getenv("INSPECT_MLFLOW_AUTOLOG_ENABLED", "true")
             self.autolog_enabled = _autolog_enabled.lower() != "false"
-            self.autolog_models = _parse_autolog_models(
-                os.getenv("INSPECT_MLFLOW_AUTOLOG_MODELS")
-            )
+            self.autolog_models = _parse_autolog_models(os.getenv("INSPECT_MLFLOW_AUTOLOG_MODELS"))
 
 
 def load_settings() -> MLflowSettings:
