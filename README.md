@@ -221,3 +221,9 @@ See [CONTRIBUTING.md](https://github.com/debu-sinha/inspect-mlflow/blob/main/CON
 - [MLflow](https://mlflow.org/) - ML experiment tracking and model management
 - [Inspect AI hooks docs](https://inspect.aisi.org.uk/extensions.html#sec-hooks) - How hooks work
 - [Issue #3547](https://github.com/UKGovernmentBEIS/inspect_ai/issues/3547) - Original proposal
+- [Vector Institute inspect-mlflow](https://github.com/VectorInstitute/inspect-mlflow) - Related extension whose features are being consolidated here
+
+## Acknowledgements
+
+This package has been developed by Debu Sinha and by the Vector Institute and the National Research Council of Canada (NRC), on behalf of the Canadian AI Safety Institute (CAISI).
+Implementation from the Vector Institute extension ([VectorInstitute/inspect-mlflow](https://github.com/VectorInstitute/inspect-mlflow)) has been consolidated into this repository.
