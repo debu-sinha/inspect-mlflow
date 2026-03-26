@@ -504,7 +504,7 @@ def test_log_inspect_tables_falls_back_to_log_location(monkeypatch):
         location="logs/fake.eval",
     )
 
-    monkeypatch.setattr("inspect_mlflow.tracking.read_eval_log", lambda _path: full_log)
+    monkeypatch.setattr("inspect_mlflow.artifacts.manager.read_eval_log", lambda _path: full_log)
 
     hook._log_inspect_tables(run_id="run-123", log=partial_log)
 
