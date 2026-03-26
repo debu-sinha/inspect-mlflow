@@ -6,6 +6,8 @@ This matches MLflow's own testing best practices.
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -28,7 +30,9 @@ from inspect_ai.log._log import (
     EvalScore,
     EvalSpec,
 )
+from inspect_ai.model._chat_message import ChatMessageAssistant
 from inspect_ai.model._generate_config import GenerateConfig
+from inspect_ai.model._model_output import ChatCompletionChoice, ModelOutput, ModelUsage
 from inspect_ai.scorer._metric import Score
 
 from inspect_mlflow.tracking import MlflowTrackingHooks
@@ -513,3 +517,115 @@ async def test_full_lifecycle(tmp_tracking_uri):
     assert child.data.tags["mlflow.parentRunId"] == parent.info.run_id
     assert child.data.metrics["match/accuracy"] == 1.0
     assert child.data.metrics["sample/match"] == 1.0
+
+
+@pytest.mark.anyio
+async def test_logs_inspect_table_artifacts(tmp_tracking_uri):
+    hook = MlflowTrackingHooks()
+    spec = _make_eval_spec()
+
+    await hook.on_run_start(RunStart(eval_set_id=None, run_id="run-001", task_names=["test_task"]))
+    await hook.on_task_start(
+        TaskStart(eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
+    )
+
+    task_run_id = hook._task_run_ids["eval-001"]
+
+    sample = EvalSample(
+        id="sample-1",
+        epoch=1,
+        input="What is 2+2?",
+        target="4",
+        messages=[
+            ChatMessageAssistant(
+                content="4",
+                source="generate",
+                model="openai/gpt-4.1-mini",
+            )
+        ],
+        output=ModelOutput(
+            model="openai/gpt-4.1-mini",
+            choices=[
+                ChatCompletionChoice(
+                    message=ChatMessageAssistant(content="4"),
+                    stop_reason="stop",
+                )
+            ],
+            usage=ModelUsage(input_tokens=7, output_tokens=3, total_tokens=10),
+        ),
+        model_usage={
+            "openai/gpt-4.1-mini": ModelUsage(
+                input_tokens=7,
+                output_tokens=3,
+                total_tokens=10,
+            )
+        },
+        scores={"match": Score(value="C", explanation="correct")},
+        total_time=1.5,
+    )
+
+    # Inject simple raw events for artifact-table extraction compatibility.
+    object.__setattr__(
+        sample,
+        "events",
+        [
+            {
+                "event": "model",
+                "timestamp": "2026-03-25T00:00:00Z",
+                "model": "openai/gpt-4.1-mini",
+                "output": {
+                    "completion": "4",
+                    "usage": {"input_tokens": 7, "output_tokens": 3, "total_tokens": 10},
+                },
+            },
+            {
+                "event": "tool",
+                "timestamp": "2026-03-25T00:00:01Z",
+                "function": "calculator",
+                "arguments": {"expression": "2+2"},
+                "result": "4",
+                "error": None,
+            },
+        ],
+    )
+
+    log = _make_eval_log(
+        scores=[
+            EvalScore(
+                name="match",
+                scorer="match",
+                metrics={"accuracy": EvalMetric(name="accuracy", value=1.0)},
+            )
+        ],
+        samples=[sample],
+    )
+    await hook.on_task_end(TaskEnd(eval_set_id=None, run_id="run-001", eval_id="eval-001", log=log))
+
+    client = mlflow.tracking.MlflowClient()
+    root_artifacts = {a.path for a in client.list_artifacts(task_run_id)}
+    assert "inspect" in root_artifacts
+
+    inspect_artifacts = {a.path for a in client.list_artifacts(task_run_id, path="inspect")}
+    expected = {
+        "inspect/tasks.json",
+        "inspect/samples.json",
+        "inspect/messages.json",
+        "inspect/sample_scores.json",
+        "inspect/events.json",
+        "inspect/model_usage.json",
+    }
+    assert expected.issubset(inspect_artifacts)
+
+    samples_local = mlflow.artifacts.download_artifacts(
+        run_id=task_run_id, artifact_path="inspect/samples.json"
+    )
+    samples_payload = json.loads(Path(samples_local).read_text())
+    assert samples_payload["columns"]
+    assert samples_payload["data"]
+
+    events_local = mlflow.artifacts.download_artifacts(
+        run_id=task_run_id, artifact_path="inspect/events.json"
+    )
+    events_payload = json.loads(Path(events_local).read_text())
+    assert "event_type" in events_payload["columns"]
+    assert len(events_payload["data"]) >= 2
