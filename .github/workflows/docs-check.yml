@@ -1,0 +1,55 @@
+name: Docs freshness check
+
+on:
+  pull_request:
+    paths:
+      - "inspect_mlflow/**"
+      - "!inspect_mlflow/__pycache__/**"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Check if source changes need docs updates
+        run: |
+          echo "=== Files changed in this PR ==="
+          changed=$(git diff --name-only origin/main...HEAD -- inspect_mlflow/)
+          echo "$changed"
+
+          needs_update=false
+
+          # New Python module added but not in api.rst?
+          for f in inspect_mlflow/*.py; do
+            mod=$(basename "$f" .py)
+            if [ "$mod" != "__init__" ] && [ "$mod" != "__pycache__" ]; then
+              if ! grep -q "inspect_mlflow.$mod" docs/source/api.rst 2>/dev/null; then
+                echo "WARNING: $mod not in api.rst"
+                needs_update=true
+              fi
+            fi
+          done
+
+          # Config fields added but not in config.rst?
+          config_fields=$(grep -oE 'INSPECT_MLFLOW_[A-Z_]+' inspect_mlflow/config.py | sort -u)
+          for field in $config_fields; do
+            if ! grep -q "$field" docs/source/config.rst 2>/dev/null; then
+              echo "WARNING: $field not in config.rst"
+              needs_update=true
+            fi
+          done
+
+          # Version changed but not in CHANGELOG?
+          version=$(grep '__version__' inspect_mlflow/__init__.py | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+          if ! grep -q "$version" CHANGELOG.md 2>/dev/null; then
+            echo "WARNING: Version $version not in CHANGELOG.md"
+            needs_update=true
+          fi
+
+          if [ "$needs_update" = true ]; then
+            echo ""
+            echo "Docs may need updating. This is a warning, not a blocker."
+          else
+            echo "Docs look up to date."
+          fi
