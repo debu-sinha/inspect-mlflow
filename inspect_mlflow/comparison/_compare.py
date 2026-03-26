@@ -96,14 +96,12 @@ def compare_evals(
 
 
 def _load_log(source: str | Path | EvalLog) -> EvalLog:
-    """Load an eval log from path or return as-is if already loaded."""
     if isinstance(source, EvalLog):
         return source
     return read_eval_log(str(source))
 
 
 def _log_path(source: str | Path | EvalLog, log: EvalLog) -> str:
-    """Get a display path for the log."""
     if isinstance(source, (str, Path)):
         return str(source)
     return log.location or "unknown"
@@ -150,7 +148,6 @@ def _resolve_scorers(
 
 
 def _get_scorer_names(log: EvalLog) -> set[str]:
-    """Extract scorer names from an eval log."""
     names: set[str] = set()
     if log.results and log.results.scores:
         for score_entry in log.results.scores:
@@ -167,7 +164,6 @@ def _compare_samples(
     scorer_names: list[str],
     regression_threshold: float = 0.0,
 ) -> list[SampleComparison]:
-    """Compare per-sample scores across aligned pairs."""
     comparisons: list[SampleComparison] = []
 
     for pair in aligned:
@@ -216,7 +212,6 @@ def _compare_metrics(
     aligned: list[AlignedSample],
     significance: float,
 ) -> list[MetricComparison]:
-    """Compare aggregate metrics and run significance tests."""
     comparisons: list[MetricComparison] = []
 
     baseline_metrics = _extract_metrics(baseline_log)
@@ -275,7 +270,6 @@ def _compare_metrics(
 
 
 def _extract_metrics(log: EvalLog) -> dict[str, dict[str, float]]:
-    """Extract {scorer: {metric_name: value}} from log results."""
     result: dict[str, dict[str, float]] = {}
     if log.results and log.results.scores:
         for score_entry in log.results.scores:
@@ -290,7 +284,6 @@ def _extract_metrics(log: EvalLog) -> dict[str, dict[str, float]]:
 
 
 def _extract_score(sample: EvalSample | None, scorer: str) -> float | None:
-    """Extract a numeric score from a sample for a given scorer."""
     if sample is None or sample.scores is None:
         return None
     score = sample.scores.get(scorer)
@@ -311,7 +304,6 @@ def _collect_paired_scores(
     aligned: list[AlignedSample],
     scorer: str,
 ) -> tuple[list[float], list[float]]:
-    """Collect paired score lists for samples present in both runs."""
     bl_scores: list[float] = []
     cd_scores: list[float] = []
 

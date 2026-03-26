@@ -88,7 +88,6 @@ def align_samples(
 
 
 def _sample_key(sample_id: int | str) -> int | str:
-    """Normalize sample ID for consistent alignment."""
     if isinstance(sample_id, str) and sample_id.isdigit():
         return int(sample_id)
     return sample_id
