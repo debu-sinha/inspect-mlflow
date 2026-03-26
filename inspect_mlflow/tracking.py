@@ -35,7 +35,7 @@ from inspect_ai.hooks import (
     TaskStart,
     hooks,
 )
-from inspect_ai.log import EvalSpec
+from inspect_ai.log import EvalSpec, read_eval_log
 from mlflow.tracking import MlflowClient
 
 from inspect_mlflow._autolog import enable_autolog
@@ -313,11 +313,22 @@ class MlflowTrackingHooks(Hooks):
         eval_id = self._obj_get(self._obj_get(log, "eval"), "eval_id") or "unknown"
         task_name = self._obj_get(self._obj_get(log, "eval"), "task") or "unknown"
 
+        source_log = log
         tables = self._extract_inspect_table_rows(
             eval_id=str(eval_id),
             task_name=str(task_name),
-            log=log,
+            log=source_log,
         )
+        if not tables["samples"]:
+            full_log = self._load_full_eval_log(log)
+            if full_log is not None:
+                source_log = full_log
+                tables = self._extract_inspect_table_rows(
+                    eval_id=str(eval_id),
+                    task_name=str(task_name),
+                    log=source_log,
+                )
+
         for name, rows in tables.items():
             if not rows:
                 continue
@@ -327,6 +338,17 @@ class MlflowTrackingHooks(Hooks):
                     data=self._rows_to_columns(rows),
                     artifact_file=f"inspect/{name}.json",
                 )
+
+    def _load_full_eval_log(self, log: Any) -> Any | None:
+        location = self._obj_get(log, "location")
+        if not isinstance(location, str) or not location:
+            return None
+
+        try:
+            return read_eval_log(location)
+        except Exception:
+            _logger.debug("Could not load full eval log from %s", location, exc_info=True)
+            return None
 
     def _extract_inspect_table_rows(
         self, *, eval_id: str, task_name: str, log: Any
@@ -717,11 +739,19 @@ class MlflowTrackingHooks(Hooks):
         return str(value)
 
     def _log_sample_table(self, run_id: str, log: Any) -> None:
-        if not log.samples:
+        source_log = log
+        samples = self._obj_get(source_log, "samples")
+        if not samples:
+            full_log = self._load_full_eval_log(log)
+            if full_log is not None:
+                source_log = full_log
+                samples = self._obj_get(source_log, "samples")
+
+        if not samples:
             return
 
         rows = []
-        for sample in log.samples:
+        for sample in samples:
             row: dict[str, Any] = {
                 "id": sample.id,
                 "epoch": sample.epoch,
@@ -742,7 +772,8 @@ class MlflowTrackingHooks(Hooks):
                         row[f"explanation/{scorer_name}"] = truncate(score.explanation, 300)
             rows.append(row)
 
-        eval_id = log.eval.eval_id if log.eval else "unknown"
+        eval_spec = self._obj_get(source_log, "eval")
+        eval_id = self._obj_get(eval_spec, "eval_id") or "unknown"
         fd, path = tempfile.mkstemp(prefix=f"sample_results_{eval_id}_", suffix=".json")
         try:
             with os.fdopen(fd, "w") as f:
