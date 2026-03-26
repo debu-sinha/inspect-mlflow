@@ -264,9 +264,7 @@ def extract_usage_from_events(sample: Any) -> dict[str, dict[str, int]]:
         if not usage:
             continue
         model_name = (
-            to_string(obj_get(event, "model"))
-            or to_string(obj_get(output, "model"))
-            or "unknown"
+            to_string(obj_get(event, "model")) or to_string(obj_get(output, "model")) or "unknown"
         )
         model_usage = usage_by_model[model_name]
         for key, value in usage.items():
