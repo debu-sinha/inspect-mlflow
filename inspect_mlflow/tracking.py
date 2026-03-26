@@ -297,6 +297,10 @@ class MlflowTrackingHooks(Hooks):
 
     def _log_eval_artifacts(self, run_id: str, log: Any) -> None:
         try:
+            self._log_inspect_tables(run_id, log)
+        except Exception:
+            _logger.debug("Failed to log inspect table artifacts", exc_info=True)
+        try:
             self._log_sample_table(run_id, log)
         except Exception:
             _logger.debug("Failed to log sample results artifact", exc_info=True)
@@ -304,6 +308,25 @@ class MlflowTrackingHooks(Hooks):
             self._log_eval_json(run_id, log)
         except Exception:
             _logger.debug("Failed to log eval log artifact", exc_info=True)
+
+    def _log_inspect_tables(self, run_id: str, log: Any) -> None:
+        eval_id = self._obj_get(self._obj_get(log, "eval"), "eval_id") or "unknown"
+        task_name = self._obj_get(self._obj_get(log, "eval"), "task") or "unknown"
+
+        tables = self._extract_inspect_table_rows(
+            eval_id=str(eval_id),
+            task_name=str(task_name),
+            log=log,
+        )
+        for name, rows in tables.items():
+            if not rows:
+                continue
+            with contextlib.suppress(Exception):
+                self.client.log_table(
+                    run_id=run_id,
+                    data=self._rows_to_columns(rows),
+                    artifact_file=f"inspect/{name}.json",
+                )
 
     def _extract_inspect_table_rows(
         self, *, eval_id: str, task_name: str, log: Any
