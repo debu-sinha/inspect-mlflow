@@ -13,12 +13,8 @@ Activated automatically when MLFLOW_TRACKING_URI is set.
 from __future__ import annotations
 
 import contextlib
-import json
 import logging
-import os
-import tempfile
 import threading
-from collections import defaultdict
 from typing import Any
 
 import mlflow
@@ -35,12 +31,29 @@ from inspect_ai.hooks import (
     TaskStart,
     hooks,
 )
-from inspect_ai.log import EvalSpec, read_eval_log
+from inspect_ai.log import EvalSpec
 from mlflow.tracking import MlflowClient
 
 from inspect_mlflow._autolog import enable_autolog
+from inspect_mlflow.artifacts.manager import ArtifactManager
+from inspect_mlflow.artifacts.tables import (
+    extract_event_rows,
+    extract_inspect_table_rows,
+    extract_message_rows,
+    extract_model_usage_rows,
+    extract_sample_score_rows,
+    extract_usage_from_events,
+    get_sample_output_text,
+    obj_get,
+    rows_to_columns,
+    scores_to_dict,
+    sum_usage_map,
+    to_json,
+    to_string,
+    usage_to_dict,
+)
 from inspect_mlflow.config import MLflowSettings, load_settings
-from inspect_mlflow.util import score_to_numeric, truncate
+from inspect_mlflow.util import score_to_numeric
 
 _logger = logging.getLogger(__name__)
 
@@ -67,6 +80,7 @@ class MlflowTrackingHooks(Hooks):
 
     def __init__(self) -> None:
         self._client: MlflowClient | None = None
+        self._artifact_manager: ArtifactManager | None = None
         self._experiment_id: str | None = None
         self._parent_run_id: str | None = None
         self._task_run_ids: dict[str, str] = {}
@@ -90,12 +104,19 @@ class MlflowTrackingHooks(Hooks):
             self._client = MlflowClient()
         return self._client
 
+    @property
+    def artifact_manager(self) -> ArtifactManager:
+        if self._artifact_manager is None:
+            self._artifact_manager = ArtifactManager(self.client, _logger)
+        return self._artifact_manager
+
     def enabled(self) -> bool:
         return load_settings().tracking_uri is not None
 
     async def on_run_start(self, data: RunStart) -> None:
         self._settings = load_settings()
         self._client = MlflowClient()
+        self._artifact_manager = ArtifactManager(self._client, _logger)
         self._autolog_enabled = False
 
         if self.settings.tracking_uri:
@@ -296,151 +317,18 @@ class MlflowTrackingHooks(Hooks):
             self._event_counts.pop(eval_id, None)
 
     def _log_eval_artifacts(self, run_id: str, log: Any) -> None:
-        try:
-            self._log_inspect_tables(run_id, log)
-        except Exception:
-            _logger.debug("Failed to log inspect table artifacts", exc_info=True)
-        try:
-            self._log_sample_table(run_id, log)
-        except Exception:
-            _logger.debug("Failed to log sample results artifact", exc_info=True)
-        try:
-            self._log_eval_json(run_id, log)
-        except Exception:
-            _logger.debug("Failed to log eval log artifact", exc_info=True)
+        self.artifact_manager.log_eval_artifacts(run_id, log)
 
     def _log_inspect_tables(self, run_id: str, log: Any) -> None:
-        eval_id = self._obj_get(self._obj_get(log, "eval"), "eval_id") or "unknown"
-        task_name = self._obj_get(self._obj_get(log, "eval"), "task") or "unknown"
-
-        source_log = log
-        tables = self._extract_inspect_table_rows(
-            eval_id=str(eval_id),
-            task_name=str(task_name),
-            log=source_log,
-        )
-        if not tables["samples"]:
-            full_log = self._load_full_eval_log(log)
-            if full_log is not None:
-                source_log = full_log
-                tables = self._extract_inspect_table_rows(
-                    eval_id=str(eval_id),
-                    task_name=str(task_name),
-                    log=source_log,
-                )
-
-        for name, rows in tables.items():
-            if not rows:
-                continue
-            with contextlib.suppress(Exception):
-                self.client.log_table(
-                    run_id=run_id,
-                    data=self._rows_to_columns(rows),
-                    artifact_file=f"inspect/{name}.json",
-                )
+        self.artifact_manager.log_inspect_tables(run_id, log)
 
     def _load_full_eval_log(self, log: Any) -> Any | None:
-        location = self._obj_get(log, "location")
-        if not isinstance(location, str) or not location:
-            return None
-
-        try:
-            return read_eval_log(location)
-        except Exception:
-            _logger.debug("Could not load full eval log from %s", location, exc_info=True)
-            return None
+        return self.artifact_manager.load_full_eval_log(log)
 
     def _extract_inspect_table_rows(
         self, *, eval_id: str, task_name: str, log: Any
     ) -> dict[str, list[dict[str, Any]]]:
-        """Build inspect table rows from eval log content."""
-        tables: dict[str, list[dict[str, Any]]] = {
-            "tasks": [],
-            "samples": [],
-            "messages": [],
-            "sample_scores": [],
-            "events": [],
-            "model_usage": [],
-        }
-
-        eval_spec = self._obj_get(log, "eval")
-        dataset = self._obj_get(eval_spec, "dataset")
-        tables["tasks"].append(
-            {
-                "task_name": task_name,
-                "eval_id": eval_id,
-                "task_file": self._obj_get(eval_spec, "task_file"),
-                "task_version": self._obj_get(eval_spec, "task_version"),
-                "task_id": self._obj_get(eval_spec, "task_id"),
-                "solver": self._to_string(self._obj_get(eval_spec, "solver")),
-                "model": self._to_string(self._obj_get(eval_spec, "model")),
-                "dataset": self._to_string(self._obj_get(dataset, "name")),
-                "dataset_samples": self._obj_get(dataset, "samples"),
-            }
-        )
-
-        samples = self._obj_get(log, "samples")
-        if not isinstance(samples, list):
-            return tables
-
-        for sample in samples:
-            sample_id = self._obj_get(sample, "id")
-            scores = self._obj_get(sample, "scores")
-            usage_map = self._obj_get(sample, "model_usage")
-            usage_totals = self._sum_usage_map(usage_map)
-            events = self._obj_get(sample, "events")
-
-            sample_row: dict[str, Any] = {
-                "task_name": task_name,
-                "eval_id": eval_id,
-                "sample_id": sample_id,
-                "input": self._to_json(self._obj_get(sample, "input")),
-                "target": self._to_json(self._obj_get(sample, "target")),
-                "output": self._get_sample_output_text(sample),
-                "scores": self._to_json(self._scores_to_dict(scores)),
-                "events_count": len(events) if isinstance(events, list) else None,
-                "total_time": self._obj_get(sample, "total_time"),
-                "working_time": self._obj_get(sample, "working_time"),
-                "error": self._to_json(self._obj_get(sample, "error")),
-            }
-            for key, value in usage_totals.items():
-                sample_row[f"usage_{key}"] = value
-            tables["samples"].append(sample_row)
-
-            tables["sample_scores"].extend(
-                self._extract_sample_score_rows(
-                    eval_id=eval_id,
-                    task_name=task_name,
-                    sample_id=sample_id,
-                    scores=scores,
-                )
-            )
-            tables["messages"].extend(
-                self._extract_message_rows(
-                    eval_id=eval_id,
-                    task_name=task_name,
-                    sample_id=sample_id,
-                    sample=sample,
-                )
-            )
-            tables["events"].extend(
-                self._extract_event_rows(
-                    eval_id=eval_id,
-                    task_name=task_name,
-                    sample_id=sample_id,
-                    sample=sample,
-                )
-            )
-            tables["model_usage"].extend(
-                self._extract_model_usage_rows(
-                    eval_id=eval_id,
-                    task_name=task_name,
-                    sample_id=sample_id,
-                    sample=sample,
-                )
-            )
-
-        return tables
+        return extract_inspect_table_rows(eval_id=eval_id, task_name=task_name, log=log)
 
     def _extract_sample_score_rows(
         self,
@@ -450,27 +338,12 @@ class MlflowTrackingHooks(Hooks):
         sample_id: Any,
         scores: Any,
     ) -> list[dict[str, Any]]:
-        rows: list[dict[str, Any]] = []
-        if scores is None or not hasattr(scores, "items"):
-            return rows
-
-        for scorer_name, score in scores.items():
-            raw_value = self._obj_get(score, "value")
-            if raw_value is None:
-                raw_value = score
-            explanation = self._obj_get(score, "explanation")
-            rows.append(
-                {
-                    "task_name": task_name,
-                    "eval_id": eval_id,
-                    "sample_id": sample_id,
-                    "scorer": str(scorer_name),
-                    "raw_value": self._to_string(raw_value),
-                    "numeric_value": score_to_numeric(raw_value),
-                    "explanation": truncate(explanation, 500) if explanation else None,
-                }
-            )
-        return rows
+        return extract_sample_score_rows(
+            eval_id=eval_id,
+            task_name=task_name,
+            sample_id=sample_id,
+            scores=scores,
+        )
 
     def _extract_message_rows(
         self,
@@ -480,28 +353,12 @@ class MlflowTrackingHooks(Hooks):
         sample_id: Any,
         sample: Any,
     ) -> list[dict[str, Any]]:
-        rows: list[dict[str, Any]] = []
-        messages = self._obj_get(sample, "messages")
-        if not isinstance(messages, list):
-            return rows
-
-        for idx, message in enumerate(messages):
-            rows.append(
-                {
-                    "task_name": task_name,
-                    "eval_id": eval_id,
-                    "sample_id": sample_id,
-                    "message_index": idx,
-                    "role": self._obj_get(message, "role"),
-                    "source": self._obj_get(message, "source"),
-                    "content": self._to_json(self._obj_get(message, "content")),
-                    "tool_calls": self._to_json(self._obj_get(message, "tool_calls")),
-                    "tool_call_id": self._obj_get(message, "tool_call_id"),
-                    "model": self._obj_get(message, "model"),
-                    "stop_reason": self._obj_get(message, "stop_reason"),
-                }
-            )
-        return rows
+        return extract_message_rows(
+            eval_id=eval_id,
+            task_name=task_name,
+            sample_id=sample_id,
+            sample=sample,
+        )
 
     def _extract_event_rows(
         self,
@@ -511,39 +368,12 @@ class MlflowTrackingHooks(Hooks):
         sample_id: Any,
         sample: Any,
     ) -> list[dict[str, Any]]:
-        rows: list[dict[str, Any]] = []
-        events = self._obj_get(sample, "events")
-        if not isinstance(events, list):
-            return rows
-
-        for idx, event in enumerate(events):
-            event_type = self._obj_get(event, "event") or self._obj_get(event, "type")
-            row: dict[str, Any] = {
-                "task_name": task_name,
-                "eval_id": eval_id,
-                "sample_id": sample_id,
-                "event_index": idx,
-                "event_type": self._to_string(event_type),
-                "timestamp": self._to_json(self._obj_get(event, "timestamp")),
-            }
-
-            if event_type == "model":
-                row["model"] = self._obj_get(event, "model")
-                output = self._obj_get(event, "output")
-                row["completion"] = self._to_json(self._obj_get(output, "completion"))
-                usage = self._usage_to_dict(self._obj_get(output, "usage"))
-                for key, value in usage.items():
-                    row[f"usage_{key}"] = value
-            elif event_type == "tool":
-                row["tool_function"] = self._obj_get(event, "function")
-                row["tool_arguments"] = self._to_json(self._obj_get(event, "arguments"))
-                row["tool_result"] = self._to_json(self._obj_get(event, "result"))
-                row["tool_error"] = self._to_json(self._obj_get(event, "error"))
-            elif event_type == "error":
-                row["error"] = self._to_json(self._obj_get(event, "error"))
-
-            rows.append(row)
-        return rows
+        return extract_event_rows(
+            eval_id=eval_id,
+            task_name=task_name,
+            sample_id=sample_id,
+            sample=sample,
+        )
 
     def _extract_model_usage_rows(
         self,
@@ -553,246 +383,50 @@ class MlflowTrackingHooks(Hooks):
         sample_id: Any,
         sample: Any,
     ) -> list[dict[str, Any]]:
-        rows: list[dict[str, Any]] = []
-        usage_map = self._obj_get(sample, "model_usage")
-
-        if isinstance(usage_map, dict) and usage_map:
-            for model_name, usage in usage_map.items():
-                usage_dict = self._usage_to_dict(usage)
-                if not usage_dict:
-                    continue
-                rows.append(
-                    {
-                        "task_name": task_name,
-                        "eval_id": eval_id,
-                        "sample_id": sample_id,
-                        "model": self._to_string(model_name),
-                        **usage_dict,
-                    }
-                )
-            return rows
-
-        usage_from_events = self._extract_usage_from_events(sample)
-        for model_name, usage_dict in usage_from_events.items():
-            rows.append(
-                {
-                    "task_name": task_name,
-                    "eval_id": eval_id,
-                    "sample_id": sample_id,
-                    "model": model_name,
-                    **usage_dict,
-                }
-            )
-        return rows
+        return extract_model_usage_rows(
+            eval_id=eval_id,
+            task_name=task_name,
+            sample_id=sample_id,
+            sample=sample,
+        )
 
     def _extract_usage_from_events(self, sample: Any) -> dict[str, dict[str, int]]:
-        events = self._obj_get(sample, "events")
-        if not isinstance(events, list):
-            return {}
-
-        usage_by_model: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
-        for event in events:
-            event_type = self._obj_get(event, "event") or self._obj_get(event, "type")
-            if event_type != "model":
-                continue
-            output = self._obj_get(event, "output")
-            usage = self._usage_to_dict(self._obj_get(output, "usage"))
-            if not usage:
-                continue
-            model_name = (
-                self._to_string(self._obj_get(event, "model"))
-                or self._to_string(self._obj_get(output, "model"))
-                or "unknown"
-            )
-            model_usage = usage_by_model[model_name]
-            for key, value in usage.items():
-                model_usage[key] = int(model_usage.get(key, 0)) + int(value)
-
-        return {
-            model: {key: int(value) for key, value in usage.items()}
-            for model, usage in usage_by_model.items()
-        }
+        return extract_usage_from_events(sample)
 
     def _sum_usage_map(self, usage_map: Any) -> dict[str, int]:
-        if not isinstance(usage_map, dict):
-            return {}
-
-        totals: dict[str, int] = defaultdict(int)
-        for usage in usage_map.values():
-            usage_dict = self._usage_to_dict(usage)
-            for key, value in usage_dict.items():
-                totals[key] += int(value)
-        return dict(totals)
+        return sum_usage_map(usage_map)
 
     def _scores_to_dict(self, scores: Any) -> dict[str, Any]:
-        if scores is None or not hasattr(scores, "items"):
-            return {}
-
-        out: dict[str, Any] = {}
-        for scorer_name, score in scores.items():
-            value = self._obj_get(score, "value")
-            if value is None:
-                value = score
-            out[str(scorer_name)] = value
-        return out
+        return scores_to_dict(scores)
 
     def _get_sample_output_text(self, sample: Any) -> str | None:
-        output = self._obj_get(sample, "output")
-        if output is None:
-            return None
-
-        choices = self._obj_get(output, "choices")
-        if isinstance(choices, list) and choices:
-            first_choice = choices[0]
-            message = self._obj_get(first_choice, "message")
-            message_text = self._obj_get(message, "text") or self._obj_get(message, "content")
-            if message_text is not None:
-                return truncate(message_text, 500)
-            choice_text = self._obj_get(first_choice, "text") or self._obj_get(
-                first_choice, "completion"
-            )
-            if choice_text is not None:
-                return truncate(choice_text, 500)
-
-        output_text = self._obj_get(output, "completion") or self._obj_get(output, "text")
-        if output_text is not None:
-            return truncate(output_text, 500)
-
-        serialized = self._to_json(output)
-        return truncate(serialized, 500) if serialized is not None else None
+        return get_sample_output_text(sample)
 
     @staticmethod
     def _usage_to_dict(usage: Any) -> dict[str, int]:
-        if usage is None:
-            return {}
-
-        usage_data: dict[str, Any] = {}
-        if isinstance(usage, dict):
-            usage_data = dict(usage)
-        elif hasattr(usage, "model_dump"):
-            with contextlib.suppress(Exception):
-                dumped = usage.model_dump(exclude_none=True)
-                if isinstance(dumped, dict):
-                    usage_data = dumped
-
-        known_keys = (
-            "input_tokens",
-            "output_tokens",
-            "total_tokens",
-            "input_tokens_cache_read",
-            "output_tokens_cache_write",
-            "reasoning_tokens",
-        )
-        for key in known_keys:
-            with contextlib.suppress(Exception):
-                value = getattr(usage, key)
-                if value is not None and key not in usage_data:
-                    usage_data[key] = value
-
-        result: dict[str, int] = {}
-        for key, value in usage_data.items():
-            if isinstance(value, bool):
-                continue
-            if isinstance(value, (int, float)):
-                result[str(key)] = int(value)
-        return result
+        return usage_to_dict(usage)
 
     @staticmethod
     def _rows_to_columns(rows: list[dict[str, Any]]) -> dict[str, list[Any]]:
-        columns: dict[str, list[Any]] = {}
-        for row in rows:
-            for key in row:
-                columns.setdefault(str(key), [])
-        for row in rows:
-            for key in columns:
-                columns[key].append(row.get(key))
-        return columns
+        return rows_to_columns(rows)
 
     @staticmethod
     def _obj_get(obj: Any, key: str) -> Any:
-        if obj is None:
-            return None
-        if isinstance(obj, dict):
-            return obj.get(key)
-        with contextlib.suppress(Exception):
-            return getattr(obj, key)
-        return None
+        return obj_get(obj, key)
 
     @staticmethod
     def _to_string(value: Any) -> str | None:
-        if value is None:
-            return None
-        return str(value)
+        return to_string(value)
 
     @staticmethod
     def _to_json(value: Any) -> str | int | float | bool | None:
-        if value is None:
-            return None
-        if isinstance(value, (str, int, float, bool)):
-            return value
-        if hasattr(value, "model_dump"):
-            with contextlib.suppress(Exception):
-                dumped = value.model_dump(mode="json")
-                return json.dumps(dumped, default=str)
-        with contextlib.suppress(Exception):
-            return json.dumps(value, default=str)
-        return str(value)
+        return to_json(value)
 
     def _log_sample_table(self, run_id: str, log: Any) -> None:
-        source_log = log
-        samples = self._obj_get(source_log, "samples")
-        if not samples:
-            full_log = self._load_full_eval_log(log)
-            if full_log is not None:
-                source_log = full_log
-                samples = self._obj_get(source_log, "samples")
-
-        if not samples:
-            return
-
-        rows = []
-        for sample in samples:
-            row: dict[str, Any] = {
-                "id": sample.id,
-                "epoch": sample.epoch,
-                "input": truncate(sample.input, 500),
-                "target": truncate(sample.target, 300),
-                "total_time": sample.total_time,
-                "error": getattr(sample, "error", None),
-            }
-            if sample.output and sample.output.choices:
-                first_choice = sample.output.choices[0]
-                row["output"] = truncate(first_choice.message.text, 500)
-            else:
-                row["output"] = ""
-            if sample.scores:
-                for scorer_name, score in sample.scores.items():
-                    row[f"score/{scorer_name}"] = score.value
-                    if score.explanation:
-                        row[f"explanation/{scorer_name}"] = truncate(score.explanation, 300)
-            rows.append(row)
-
-        eval_spec = self._obj_get(source_log, "eval")
-        eval_id = self._obj_get(eval_spec, "eval_id") or "unknown"
-        fd, path = tempfile.mkstemp(prefix=f"sample_results_{eval_id}_", suffix=".json")
-        try:
-            with os.fdopen(fd, "w") as f:
-                json.dump(rows, f, indent=2, default=str)
-            self.client.log_artifact(run_id, path, artifact_path="sample_results")
-        finally:
-            os.unlink(path)
+        self.artifact_manager.log_sample_table(run_id, log)
 
     def _log_eval_json(self, run_id: str, log: Any) -> None:
-        eval_id = log.eval.eval_id if log.eval else "unknown"
-        log_data = log.model_dump(mode="json", exclude={"samples"})
-
-        fd, path = tempfile.mkstemp(prefix=f"eval_log_{eval_id}_", suffix=".json")
-        try:
-            with os.fdopen(fd, "w") as f:
-                json.dump(log_data, f, indent=2, default=str)
-            self.client.log_artifact(run_id, path, artifact_path="eval_logs")
-        finally:
-            os.unlink(path)
+        self.artifact_manager.log_eval_json(run_id, log)
 
     async def on_sample_end(self, data: SampleEnd) -> None:
         eval_id = data.eval_id
