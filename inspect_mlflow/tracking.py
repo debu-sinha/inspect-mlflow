@@ -37,6 +37,7 @@ from inspect_ai.hooks import (
 from inspect_ai.log import EvalSpec
 from mlflow.tracking import MlflowClient
 
+from inspect_mlflow._autolog import enable_autolog
 from inspect_mlflow.config import MLflowSettings, load_settings
 from inspect_mlflow.util import score_to_numeric, truncate
 
@@ -74,6 +75,7 @@ class MlflowTrackingHooks(Hooks):
         self._event_counts: dict[str, dict[str, int]] = {}
         self._lock = threading.Lock()
         self._settings: MLflowSettings | None = None
+        self._autolog_enabled = False
 
     @property
     def settings(self) -> MLflowSettings:
@@ -93,6 +95,11 @@ class MlflowTrackingHooks(Hooks):
     async def on_run_start(self, data: RunStart) -> None:
         self._settings = load_settings()
         self._client = MlflowClient()
+        self._autolog_enabled = False
+
+        if self.settings.tracking_uri:
+            with contextlib.suppress(Exception):
+                mlflow.set_tracking_uri(self.settings.tracking_uri)
 
         experiment = self._client.get_experiment_by_name(self.settings.experiment_name)
         if experiment is None:
@@ -100,9 +107,15 @@ class MlflowTrackingHooks(Hooks):
         else:
             self._experiment_id = experiment.experiment_id
 
+        with contextlib.suppress(Exception):
+            mlflow.set_experiment(self.settings.experiment_name)
+
         # Enable async logging for reduced hook latency
         with contextlib.suppress(Exception):
             mlflow.config.enable_async_logging(True)
+
+        if self.settings.autolog_enabled:
+            self._enable_autolog(self.settings.autolog_models)
 
         run = self._client.create_run(
             experiment_id=self._experiment_id,
@@ -132,11 +145,27 @@ class MlflowTrackingHooks(Hooks):
                 _logger.debug("Failed to terminate parent run", exc_info=True)
             self._parent_run_id = None
 
+        if self._autolog_enabled:
+            self._disable_autolog()
+
         self._task_run_ids.clear()
         self._tasks.clear()
         self._sample_counts.clear()
         self._model_usage.clear()
         self._event_counts.clear()
+
+    def _enable_autolog(self, models: list[str]) -> None:
+        enabled_any = enable_autolog(models)
+        self._autolog_enabled = enabled_any
+        if enabled_any:
+            _logger.info("MLflow autolog enabled for: %s", models)
+
+    def _disable_autolog(self) -> None:
+        try:
+            mlflow.autolog(disable=True)
+        except Exception:
+            _logger.debug("Could not disable autolog", exc_info=True)
+        self._autolog_enabled = False
 
     async def on_task_start(self, data: TaskStart) -> None:
         self._tasks[data.eval_id] = data.spec

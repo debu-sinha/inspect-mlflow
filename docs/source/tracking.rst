@@ -17,6 +17,7 @@ Features
 - Real-time event counting (model calls, tool calls)
 - Eval artifacts: per-sample results JSON + full eval log JSON
 - Trace assessments: eval scores logged via ``mlflow.log_feedback()``
+- Optional provider autolog integration for LLM SDKs
 - Async logging for reduced hook latency
 - Thread-safe counters for concurrent samples
 
@@ -46,6 +47,18 @@ Configuration
      - No
      - ``true``
      - Same as above (new prefix, takes priority)
+   * - ``INSPECT_MLFLOW_AUTOLOG_ENABLED``
+     - No
+     - ``true``
+     - Enable MLflow provider autolog integrations
+   * - ``INSPECT_MLFLOW_AUTOLOG_MODELS``
+     - No
+     - ``openai,anthropic,langchain,litellm``
+     - CSV or JSON array of providers to autolog
+
+Supported provider integrations: ``openai``, ``anthropic``, ``langchain``, ``litellm``,
+``mistral``, ``groq``, ``cohere``, ``gemini``, ``bedrock``.
+Providers are enabled only when both the MLflow flavor module and provider SDK are present.
 
 API Reference
 -------------

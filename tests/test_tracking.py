@@ -6,7 +6,7 @@ This matches MLflow's own testing best practices.
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import mlflow
 import pytest
@@ -97,6 +97,53 @@ def test_enabled_requires_tracking_uri(monkeypatch):
 
     monkeypatch.setenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
     assert hook.enabled() is True
+
+
+@pytest.mark.anyio
+async def test_run_start_enables_autolog_when_enabled(tmp_tracking_uri, monkeypatch):
+    monkeypatch.setenv("INSPECT_MLFLOW_AUTOLOG_ENABLED", "true")
+    monkeypatch.setenv("INSPECT_MLFLOW_AUTOLOG_MODELS", "openai,anthropic")
+    hook = MlflowTrackingHooks()
+
+    with patch("inspect_mlflow.tracking.enable_autolog", return_value=True) as mock_enable:
+        await hook.on_run_start(
+            RunStart(eval_set_id=None, run_id="run-auto-1", task_names=["task"])
+        )
+        mock_enable.assert_called_once_with(["openai", "anthropic"])
+        assert hook._autolog_enabled is True
+
+
+@pytest.mark.anyio
+async def test_run_start_skips_autolog_when_disabled(tmp_tracking_uri, monkeypatch):
+    monkeypatch.setenv("INSPECT_MLFLOW_AUTOLOG_ENABLED", "false")
+    hook = MlflowTrackingHooks()
+
+    with patch("inspect_mlflow.tracking.enable_autolog", return_value=True) as mock_enable:
+        await hook.on_run_start(
+            RunStart(eval_set_id=None, run_id="run-auto-2", task_names=["task"])
+        )
+        mock_enable.assert_not_called()
+        assert hook._autolog_enabled is False
+
+
+@pytest.mark.anyio
+async def test_run_end_disables_mlflow_autolog_when_enabled(tmp_tracking_uri, monkeypatch):
+    monkeypatch.setenv("INSPECT_MLFLOW_AUTOLOG_ENABLED", "true")
+    hook = MlflowTrackingHooks()
+
+    with (
+        patch("inspect_mlflow.tracking.enable_autolog", return_value=True),
+        patch("inspect_mlflow.tracking.mlflow.autolog") as mock_mlflow_autolog,
+    ):
+        await hook.on_run_start(
+            RunStart(eval_set_id=None, run_id="run-auto-3", task_names=["task"])
+        )
+        assert hook._autolog_enabled is True
+        await hook.on_run_end(
+            RunEnd(eval_set_id=None, run_id="run-auto-3", exception=None, logs=[])
+        )
+        mock_mlflow_autolog.assert_called_once_with(disable=True)
+        assert hook._autolog_enabled is False
 
 
 # --- Run lifecycle ---
