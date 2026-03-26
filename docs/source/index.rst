@@ -24,6 +24,7 @@ Set environment variables and run evals as usual. Hooks auto-register via entry 
 
    tracking
    tracing
+   comparison
    config
    scout
    api
