@@ -65,7 +65,7 @@ Providers are enabled only when both the MLflow flavor module and provider SDK a
 Artifacts
 ---------
 
-With artifact logging enabled, the tracking hook writes additional structured table artifacts:
+With artifact logging enabled, the tracking hook writes the following artifacts:
 
 - ``inspect/tasks.json``
 - ``inspect/samples.json``
@@ -73,9 +73,6 @@ With artifact logging enabled, the tracking hook writes additional structured ta
 - ``inspect/sample_scores.json``
 - ``inspect/events.json``
 - ``inspect/model_usage.json``
-
-Existing artifacts:
-
 - ``sample_results/*.json``
 - ``eval_logs/*.json``
 

@@ -120,7 +120,7 @@ Each provider is enabled only when both the MLflow flavor module and provider SD
 ### Artifact Tables
 
 When artifact logging is enabled (`INSPECT_MLFLOW_LOG_ARTIFACTS=true` or
-`MLFLOW_INSPECT_LOG_ARTIFACTS=true`), the tracking hook logs additional structured MLflow table artifacts:
+`MLFLOW_INSPECT_LOG_ARTIFACTS=true`), the tracking hook logs the following artifacts:
 
 - `inspect/tasks.json`
 - `inspect/samples.json`
@@ -128,9 +128,6 @@ When artifact logging is enabled (`INSPECT_MLFLOW_LOG_ARTIFACTS=true` or
 - `inspect/sample_scores.json`
 - `inspect/events.json`
 - `inspect/model_usage.json`
-
-Existing artifacts:
-
 - `sample_results/*.json`
 - `eval_logs/*.json`
 
