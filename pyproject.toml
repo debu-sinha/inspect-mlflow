@@ -1,7 +1,7 @@
 [project]
 name = "inspect-mlflow"
 dynamic = ["version"]
-description = "MLflow integration for Inspect AI: experiment tracking, execution tracing, and Scout analysis"
+description = "MLflow integration for Inspect AI: experiment tracking, execution tracing, evaluation comparison, and Scout analysis"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
@@ -23,6 +23,7 @@ classifiers = [
 dependencies = [
     "inspect-ai>=0.3.180",
     "mlflow>=3.0,<4.0",
+    "numpy>=1.24",
 ]
 
 [project.optional-dependencies]

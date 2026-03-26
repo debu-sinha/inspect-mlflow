@@ -131,6 +131,46 @@ When artifact logging is enabled (`INSPECT_MLFLOW_LOG_ARTIFACTS=true` or
 - `sample_results/*.json`
 - `eval_logs/*.json`
 
+### Evaluation Comparison
+
+Compare results from two evaluation runs to detect score regressions with statistical significance testing.
+
+```python
+from inspect_mlflow.comparison import compare_evals
+
+result = compare_evals("logs/baseline.eval", "logs/candidate.eval")
+print(result.summary())
+
+# Per-sample regressions
+for r in result.regressions:
+    print(f"Sample {r.id}: {r.baseline_score} -> {r.candidate_score}")
+```
+
+Output:
+
+```
+Baseline:  openai/gpt-4o-mini (math_task)
+Candidate: openai/gpt-4o-mini (math_task)
+Samples:   5 aligned, 0 missing, 0 new
+
+  Metric            Baseline  Candidate             Delta        Sig.
+  -------------------------------------------------------------------
+  match/accuracy      0.6000     0.4000   -0.2000 (-33.3%)  p=0.048*
+  Effect size (match/accuracy): Cohen's d = -0.73 (medium effect)
+
+Regressions: 2, Improvements: 1, Unchanged: 2
+Candidate won on 1 of 5 samples (20.0%)
+```
+
+The comparison module aligns samples by (id, epoch), automatically selects the right significance test (McNemar's for binary scores, bootstrap CI for continuous), and computes Cohen's d effect size. No scipy required.
+
+**Features:**
+- Sample alignment with string/int ID normalization and multi-epoch support
+- Regression threshold to filter noise (`regression_threshold=0.05`)
+- Sample filtering (`sample_filter=lambda s: s.id in subset`)
+- Win rate tracking across aligned samples
+- Works with file paths or `EvalLog` objects directly
+
 ## Configuration
 
 Configuration is loaded from environment variables. When `pydantic-settings` is installed (`pip install inspect-mlflow[config]`), settings are typed and validated with the `INSPECT_MLFLOW_` prefix. Without it, standard `os.getenv()` is used.

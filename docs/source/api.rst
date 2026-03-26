@@ -13,6 +13,22 @@ API Reference
    :members:
    :undoc-members:
 
+.. automodule:: inspect_mlflow.comparison
+   :members:
+   :undoc-members:
+
+.. automodule:: inspect_mlflow.comparison._compare
+   :members:
+   :undoc-members:
+
+.. automodule:: inspect_mlflow.comparison._types
+   :members:
+   :undoc-members:
+
+.. automodule:: inspect_mlflow.comparison._statistics
+   :members:
+   :undoc-members:
+
 .. automodule:: inspect_mlflow.scout
    :members:
    :undoc-members:

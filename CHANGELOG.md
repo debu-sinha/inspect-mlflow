@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.0 (2026-03-26)
+
+- Evaluation comparison and regression detection: `compare_evals()` aligns samples by (id, epoch), computes score deltas, runs significance tests (bootstrap CI for continuous, McNemar's for binary), and reports effect size (Cohen's d)
+- Statistical tests implemented with NumPy only (no scipy dependency)
+- Sample filtering, regression threshold, and win rate tracking
+- 100+ unit tests
+
 ## 0.6.0 (2026-03-26)
 
 - Structured artifact tables: tasks, samples, messages, sample_scores, events, model_usage logged as `inspect/*.json` via `client.log_table()`. Contributed by **Farnaz Kohankhaki** (Vector Institute / NRC Canada). PR #10.
