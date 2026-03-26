@@ -54,6 +54,7 @@ Activated when `MLFLOW_TRACKING_URI` is set. Creates hierarchical MLflow runs wi
 - Model token usage (input/output/total tokens per model)
 - Real-time event counting (total_model_calls, total_tool_calls)
 - Eval artifacts: per-sample results JSON + full eval log JSON
+- Additional rich table artifacts for analysis (`inspect/*.json`)
 - Trace assessments: eval scores logged as MLflow assessments via `mlflow.log_feedback()`, visible in the Traces UI assessment column
 
 **Task run showing 17 metrics and parameters from a tool-using eval:**
@@ -115,6 +116,20 @@ Autolog enables MLflow provider integrations at run start.
 Supported providers are: `openai`, `anthropic`, `langchain`, `litellm`,
 `mistral`, `groq`, `cohere`, `gemini`, `bedrock`.
 Each provider is enabled only when both the MLflow flavor module and provider SDK are installed.
+
+### Artifact Tables
+
+When artifact logging is enabled (`INSPECT_MLFLOW_LOG_ARTIFACTS=true` or
+`MLFLOW_INSPECT_LOG_ARTIFACTS=true`), the tracking hook logs the following artifacts:
+
+- `inspect/tasks.json`
+- `inspect/samples.json`
+- `inspect/messages.json`
+- `inspect/sample_scores.json`
+- `inspect/events.json`
+- `inspect/model_usage.json`
+- `sample_results/*.json`
+- `eval_logs/*.json`
 
 ## Configuration
 

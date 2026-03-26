@@ -13,10 +13,7 @@ Activated automatically when MLFLOW_TRACKING_URI is set.
 from __future__ import annotations
 
 import contextlib
-import json
 import logging
-import os
-import tempfile
 import threading
 from typing import Any
 
@@ -38,8 +35,25 @@ from inspect_ai.log import EvalSpec
 from mlflow.tracking import MlflowClient
 
 from inspect_mlflow._autolog import enable_autolog
+from inspect_mlflow.artifacts.manager import ArtifactManager
+from inspect_mlflow.artifacts.tables import (
+    extract_event_rows,
+    extract_inspect_table_rows,
+    extract_message_rows,
+    extract_model_usage_rows,
+    extract_sample_score_rows,
+    extract_usage_from_events,
+    get_sample_output_text,
+    obj_get,
+    rows_to_columns,
+    scores_to_dict,
+    sum_usage_map,
+    to_json,
+    to_string,
+    usage_to_dict,
+)
 from inspect_mlflow.config import MLflowSettings, load_settings
-from inspect_mlflow.util import score_to_numeric, truncate
+from inspect_mlflow.util import score_to_numeric
 
 _logger = logging.getLogger(__name__)
 
@@ -66,6 +80,7 @@ class MlflowTrackingHooks(Hooks):
 
     def __init__(self) -> None:
         self._client: MlflowClient | None = None
+        self._artifact_manager: ArtifactManager | None = None
         self._experiment_id: str | None = None
         self._parent_run_id: str | None = None
         self._task_run_ids: dict[str, str] = {}
@@ -89,12 +104,19 @@ class MlflowTrackingHooks(Hooks):
             self._client = MlflowClient()
         return self._client
 
+    @property
+    def artifact_manager(self) -> ArtifactManager:
+        if self._artifact_manager is None:
+            self._artifact_manager = ArtifactManager(self.client, _logger)
+        return self._artifact_manager
+
     def enabled(self) -> bool:
         return load_settings().tracking_uri is not None
 
     async def on_run_start(self, data: RunStart) -> None:
         self._settings = load_settings()
         self._client = MlflowClient()
+        self._artifact_manager = ArtifactManager(self._client, _logger)
         self._autolog_enabled = False
 
         if self.settings.tracking_uri:
@@ -295,61 +317,116 @@ class MlflowTrackingHooks(Hooks):
             self._event_counts.pop(eval_id, None)
 
     def _log_eval_artifacts(self, run_id: str, log: Any) -> None:
-        try:
-            self._log_sample_table(run_id, log)
-        except Exception:
-            _logger.debug("Failed to log sample results artifact", exc_info=True)
-        try:
-            self._log_eval_json(run_id, log)
-        except Exception:
-            _logger.debug("Failed to log eval log artifact", exc_info=True)
+        self.artifact_manager.log_eval_artifacts(run_id, log)
+
+    def _log_inspect_tables(self, run_id: str, log: Any) -> None:
+        self.artifact_manager.log_inspect_tables(run_id, log)
+
+    def _load_full_eval_log(self, log: Any) -> Any | None:
+        return self.artifact_manager.load_full_eval_log(log)
+
+    def _extract_inspect_table_rows(
+        self, *, eval_id: str, task_name: str, log: Any
+    ) -> dict[str, list[dict[str, Any]]]:
+        return extract_inspect_table_rows(eval_id=eval_id, task_name=task_name, log=log)
+
+    def _extract_sample_score_rows(
+        self,
+        *,
+        eval_id: str,
+        task_name: str,
+        sample_id: Any,
+        scores: Any,
+    ) -> list[dict[str, Any]]:
+        return extract_sample_score_rows(
+            eval_id=eval_id,
+            task_name=task_name,
+            sample_id=sample_id,
+            scores=scores,
+        )
+
+    def _extract_message_rows(
+        self,
+        *,
+        eval_id: str,
+        task_name: str,
+        sample_id: Any,
+        sample: Any,
+    ) -> list[dict[str, Any]]:
+        return extract_message_rows(
+            eval_id=eval_id,
+            task_name=task_name,
+            sample_id=sample_id,
+            sample=sample,
+        )
+
+    def _extract_event_rows(
+        self,
+        *,
+        eval_id: str,
+        task_name: str,
+        sample_id: Any,
+        sample: Any,
+    ) -> list[dict[str, Any]]:
+        return extract_event_rows(
+            eval_id=eval_id,
+            task_name=task_name,
+            sample_id=sample_id,
+            sample=sample,
+        )
+
+    def _extract_model_usage_rows(
+        self,
+        *,
+        eval_id: str,
+        task_name: str,
+        sample_id: Any,
+        sample: Any,
+    ) -> list[dict[str, Any]]:
+        return extract_model_usage_rows(
+            eval_id=eval_id,
+            task_name=task_name,
+            sample_id=sample_id,
+            sample=sample,
+        )
+
+    def _extract_usage_from_events(self, sample: Any) -> dict[str, dict[str, int]]:
+        return extract_usage_from_events(sample)
+
+    def _sum_usage_map(self, usage_map: Any) -> dict[str, int]:
+        return sum_usage_map(usage_map)
+
+    def _scores_to_dict(self, scores: Any) -> dict[str, Any]:
+        return scores_to_dict(scores)
+
+    def _get_sample_output_text(self, sample: Any) -> str | None:
+        return get_sample_output_text(sample)
+
+    @staticmethod
+    def _usage_to_dict(usage: Any) -> dict[str, int]:
+        return usage_to_dict(usage)
+
+    @staticmethod
+    def _rows_to_columns(rows: list[dict[str, Any]]) -> dict[str, list[Any]]:
+        return rows_to_columns(rows)
+
+    @staticmethod
+    def _obj_get(obj: Any, key: str) -> Any:
+        return obj_get(obj, key)
+
+    @staticmethod
+    def _to_string(value: Any) -> str | None:
+        return to_string(value)
+
+    @staticmethod
+    def _to_json(value: Any) -> str | int | float | bool | None:
+        return to_json(value)
 
     def _log_sample_table(self, run_id: str, log: Any) -> None:
-        if not log.samples:
-            return
-
-        rows = []
-        for sample in log.samples:
-            row: dict[str, Any] = {
-                "id": sample.id,
-                "epoch": sample.epoch,
-                "input": truncate(sample.input, 500),
-                "target": truncate(sample.target, 300),
-                "total_time": sample.total_time,
-                "error": getattr(sample, "error", None),
-            }
-            if sample.output and sample.output.choices:
-                first_choice = sample.output.choices[0]
-                row["output"] = truncate(first_choice.message.text, 500)
-            else:
-                row["output"] = ""
-            if sample.scores:
-                for scorer_name, score in sample.scores.items():
-                    row[f"score/{scorer_name}"] = score.value
-                    if score.explanation:
-                        row[f"explanation/{scorer_name}"] = truncate(score.explanation, 300)
-            rows.append(row)
-
-        eval_id = log.eval.eval_id if log.eval else "unknown"
-        fd, path = tempfile.mkstemp(prefix=f"sample_results_{eval_id}_", suffix=".json")
-        try:
-            with os.fdopen(fd, "w") as f:
-                json.dump(rows, f, indent=2, default=str)
-            self.client.log_artifact(run_id, path, artifact_path="sample_results")
-        finally:
-            os.unlink(path)
+        self.artifact_manager.log_sample_table(run_id, log)
 
     def _log_eval_json(self, run_id: str, log: Any) -> None:
-        eval_id = log.eval.eval_id if log.eval else "unknown"
-        log_data = log.model_dump(mode="json", exclude={"samples"})
-
-        fd, path = tempfile.mkstemp(prefix=f"eval_log_{eval_id}_", suffix=".json")
-        try:
-            with os.fdopen(fd, "w") as f:
-                json.dump(log_data, f, indent=2, default=str)
-            self.client.log_artifact(run_id, path, artifact_path="eval_logs")
-        finally:
-            os.unlink(path)
+        self.artifact_manager.log_eval_json(run_id, log)
 
     async def on_sample_end(self, data: SampleEnd) -> None:
         eval_id = data.eval_id
