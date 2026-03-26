@@ -57,13 +57,17 @@ Activated when `MLFLOW_TRACKING_URI` is set. Creates hierarchical MLflow runs wi
 - Additional rich table artifacts for analysis (`inspect/*.json`)
 - Trace assessments: eval scores logged as MLflow assessments via `mlflow.log_feedback()`, visible in the Traces UI assessment column
 
-**Task run showing 17 metrics and parameters from a tool-using eval:**
+**Task run with 15 metrics, parameters, and parent run link:**
 
-![Task run detail](https://raw.githubusercontent.com/debu-sinha/inspect-mlflow/main/docs/images/screenshot-02-task-run.png)
+![Task run detail](https://raw.githubusercontent.com/debu-sinha/inspect-mlflow/main/docs/images/screenshot-01-task-run.png)
 
-**Traces table with assessment column showing eval scores (match: AVG 1.0):**
+**Traces table with assessment column showing per-sample match scores:**
 
-![Trace assessments](https://raw.githubusercontent.com/debu-sinha/inspect-mlflow/main/docs/images/screenshot-assessments.png)
+![Traces list](https://raw.githubusercontent.com/debu-sinha/inspect-mlflow/main/docs/images/screenshot-03-traces-list.png)
+
+**Artifact tables (inspect/) with structured eval data:**
+
+![Artifacts](https://raw.githubusercontent.com/debu-sinha/inspect-mlflow/main/docs/images/screenshot-02-artifacts-expanded.png)
 
 ### Tracing Hook
 
@@ -98,17 +102,13 @@ eval_run:98h4b4KN (CHAIN)
 | TOOL | function name, arguments, result, working time, errors |
 | EVALUATOR | score value, explanation, target |
 
-**Traces list showing 3 eval runs (simple math + tool-using calculator eval):**
+**Full span tree with solver/scorer hierarchy and assessments panel:**
 
-![Traces list](https://raw.githubusercontent.com/debu-sinha/inspect-mlflow/main/docs/images/screenshot-04-traces-list.png)
-
-**Full span tree showing solver/scorer hierarchy with tool calls:**
-
-![Span tree](https://raw.githubusercontent.com/debu-sinha/inspect-mlflow/main/docs/images/inspect-tracing-04-timeline.png)
+![Span tree](https://raw.githubusercontent.com/debu-sinha/inspect-mlflow/main/docs/images/screenshot-04-span-tree.png)
 
 **LLM span detail with model name, token counts, and response:**
 
-![LLM detail](https://raw.githubusercontent.com/debu-sinha/inspect-mlflow/main/docs/images/inspect-tracing-05-model-expanded.png)
+![LLM detail](https://raw.githubusercontent.com/debu-sinha/inspect-mlflow/main/docs/images/screenshot-05-llm-detail.png)
 
 ### Autolog
 
