@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.0 (2026-03-26)
+
+- Structured artifact tables: tasks, samples, messages, sample_scores, events, model_usage logged as `inspect/*.json` via `client.log_table()`. Contributed by **Farnaz Kohankhaki** (Vector Institute / NRC Canada). PR #10.
+- Artifact manager refactor: extraction logic in `artifacts/tables.py`, logging in `artifacts/manager.py`
+- Fallback to full eval log when task-end samples are absent
+- 65 unit tests
+
 ## 0.5.0 (2026-03-25)
 
 - LLM provider autolog: openai, anthropic, langchain, litellm, mistral, groq, cohere, gemini, bedrock. Dependency gating ensures providers are only enabled when both the MLflow flavor and provider SDK are installed. Contributed by **Farnaz Kohankhaki** (Vector Institute / NRC Canada). PR #6.

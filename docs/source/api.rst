@@ -21,6 +21,14 @@ API Reference
    :members:
    :undoc-members:
 
+.. automodule:: inspect_mlflow.artifacts.tables
+   :members:
+   :undoc-members:
+
+.. automodule:: inspect_mlflow.artifacts.manager
+   :members:
+   :undoc-members:
+
 .. automodule:: inspect_mlflow.config
    :members:
    :undoc-members:

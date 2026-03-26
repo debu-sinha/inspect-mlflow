@@ -3,7 +3,8 @@ inspect-mlflow
 
 MLflow integration for `Inspect AI <https://inspect.aisi.org.uk/>`_.
 Provides experiment tracking, execution tracing, LLM provider autolog,
-trace assessments, and Scout analysis for Inspect AI evaluations.
+structured artifact tables, trace assessments, and Scout analysis for
+Inspect AI evaluations.
 
 .. code-block:: bash
 
