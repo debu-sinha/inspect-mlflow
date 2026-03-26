@@ -460,6 +460,63 @@ def test_rows_to_columns_aligns_missing_keys():
     assert columns["c"] == [None, "y"]
 
 
+def test_log_inspect_tables_falls_back_to_log_location(monkeypatch):
+    hook = MlflowTrackingHooks()
+    hook._client = MagicMock()
+
+    sample = SimpleNamespace(
+        id="sample-1",
+        input="What is 2+2?",
+        target="4",
+        total_time=1.0,
+        working_time=0.8,
+        error=None,
+        model_usage={
+            "mockllm/model": {
+                "input_tokens": 5,
+                "output_tokens": 3,
+                "total_tokens": 8,
+            }
+        },
+        output=SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(text="4"))],
+        ),
+        scores={"exact": Score(value="C", explanation="correct")},
+        messages=[SimpleNamespace(role="assistant", source="generate", content="4")],
+        events=[
+            {
+                "event": "model",
+                "model": "mockllm/model",
+                "output": {
+                    "completion": "4",
+                    "usage": {"input_tokens": 5, "output_tokens": 3, "total_tokens": 8},
+                },
+            }
+        ],
+    )
+    full_log = SimpleNamespace(
+        eval=_make_eval_spec(eval_id="eval-001"),
+        samples=[sample],
+    )
+    partial_log = SimpleNamespace(
+        eval=_make_eval_spec(eval_id="eval-001"),
+        samples=[],
+        location="logs/fake.eval",
+    )
+
+    monkeypatch.setattr("inspect_mlflow.tracking.read_eval_log", lambda _path: full_log)
+
+    hook._log_inspect_tables(run_id="run-123", log=partial_log)
+
+    artifact_files = [c.kwargs["artifact_file"] for c in hook._client.log_table.call_args_list]
+    assert "inspect/tasks.json" in artifact_files
+    assert "inspect/samples.json" in artifact_files
+    assert "inspect/sample_scores.json" in artifact_files
+    assert "inspect/messages.json" in artifact_files
+    assert "inspect/events.json" in artifact_files
+    assert "inspect/model_usage.json" in artifact_files
+
+
 # --- Full lifecycle integration ---
 
 
