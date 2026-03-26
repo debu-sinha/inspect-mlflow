@@ -18,7 +18,6 @@ Features
 - Eval artifacts: per-sample results JSON + full eval log JSON
 - Additional rich table artifacts under ``inspect/*.json`` (tasks, samples,
   messages, sample scores, events, model usage)
-- Trace assessments: eval scores logged via ``mlflow.log_feedback()``
 - Optional provider autolog integration for LLM SDKs
 - Async logging for reduced hook latency
 - Thread-safe counters for concurrent samples

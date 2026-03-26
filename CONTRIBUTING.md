@@ -14,6 +14,11 @@ uv run pre-commit install
 ```bash
 uv run pytest tests/ -v
 uv run pytest tests/ --cov=inspect_mlflow --cov-report=term-missing
+
+# Run specific test modules
+uv run pytest tests/test_comparison.py -v    # comparison module
+uv run pytest tests/test_tracking.py -v      # tracking hook
+uv run pytest tests/test_tracing.py -v       # tracing hook
 ```
 
 ## Linting
@@ -58,6 +63,14 @@ eval(task, model='openai/gpt-4o-mini')
 ```
 
 Open http://127.0.0.1:5556 to see runs and traces.
+
+## Building Docs
+
+```bash
+uv pip install sphinx furo
+sphinx-build -b html docs/source docs/build
+open docs/build/index.html
+```
 
 ## Pull Requests
 

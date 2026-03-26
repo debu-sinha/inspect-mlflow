@@ -25,6 +25,10 @@ API Reference
    :members:
    :undoc-members:
 
+.. automodule:: inspect_mlflow.comparison._alignment
+   :members:
+   :undoc-members:
+
 .. automodule:: inspect_mlflow.comparison._statistics
    :members:
    :undoc-members:

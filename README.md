@@ -11,7 +11,7 @@
 [![Docs](https://readthedocs.org/projects/inspect-mlflow/badge/?version=latest)](https://inspect-mlflow.readthedocs.io/)
 [![GitHub stars](https://img.shields.io/github/stars/debu-sinha/inspect-mlflow?style=social)](https://github.com/debu-sinha/inspect-mlflow)
 
-MLflow integration for [Inspect AI](https://inspect.aisi.org.uk/). Provides experiment tracking, execution tracing, and artifact logging for Inspect AI evaluations.
+MLflow integration for [Inspect AI](https://inspect.aisi.org.uk/). Provides experiment tracking, execution tracing, evaluation comparison, and artifact logging for Inspect AI evaluations.
 
 ## Install
 
@@ -55,15 +55,10 @@ Activated when `MLFLOW_TRACKING_URI` is set. Creates hierarchical MLflow runs wi
 - Real-time event counting (total_model_calls, total_tool_calls)
 - Eval artifacts: per-sample results JSON + full eval log JSON
 - Additional rich table artifacts for analysis (`inspect/*.json`)
-- Trace assessments: eval scores logged as MLflow assessments via `mlflow.log_feedback()`, visible in the Traces UI assessment column
 
 **Task run with 15 metrics, parameters, and parent run link:**
 
 ![Task run detail](https://raw.githubusercontent.com/debu-sinha/inspect-mlflow/main/docs/images/screenshot-01-task-run.png)
-
-**Traces table with assessment column showing per-sample match scores:**
-
-![Traces list](https://raw.githubusercontent.com/debu-sinha/inspect-mlflow/main/docs/images/screenshot-03-traces-list.png)
 
 **Artifact tables (inspect/) with structured eval data:**
 
@@ -71,7 +66,7 @@ Activated when `MLFLOW_TRACKING_URI` is set. Creates hierarchical MLflow runs wi
 
 ### Tracing Hook
 
-Activated when `MLFLOW_INSPECT_TRACING=true` is also set. Maps eval execution to MLflow trace spans, giving you a visual debugging view of every model call, tool invocation, and scoring step.
+Activated when `MLFLOW_INSPECT_TRACING=true` is also set. Maps eval execution to MLflow trace spans, giving you a visual debugging view of every model call, tool invocation, and scoring step. Eval scores are logged as MLflow trace assessments via `mlflow.log_feedback()`, visible in the Traces UI assessment column.
 
 **Span hierarchy:**
 
