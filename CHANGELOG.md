@@ -1,8 +1,33 @@
 # Changelog
 
+## 0.5.0 (2026-03-25)
+
+- LLM provider autolog: openai, anthropic, langchain, litellm, mistral, groq, cohere, gemini, bedrock. Dependency gating ensures providers are only enabled when both the MLflow flavor and provider SDK are installed. Contributed by **Farnaz Kohankhaki** (Vector Institute / NRC Canada). PR #6.
+- Autolog config: `INSPECT_MLFLOW_AUTOLOG_ENABLED`, `INSPECT_MLFLOW_AUTOLOG_MODELS` (CSV or JSON array)
+- 60 unit tests
+
+## 0.4.2 (2026-03-24)
+
+- Migrated tracking hook to MlflowClient API (no global mlflow.start_run calls)
+- Thread-safe counters with threading.Lock
+- Async logging enabled
+- Tests rewritten with real SQLite store (no mocks on MLflow API)
+- Python requirement lowered to 3.10+
+
+## 0.4.0 (2026-03-24)
+
+- Typed configuration via pydantic-settings with dataclass fallback
+- Both MLFLOW_ and INSPECT_MLFLOW_ env var prefixes supported
+- Lazy settings loading
+- ReadTheDocs documentation with config page
+
+## 0.3.1 (2026-03-23)
+
+- Trace assessments via mlflow.log_feedback()
+
 ## 0.3.0 (2026-03-22)
 
-- Log Inspect AI eval scores as MLflow trace assessments via `mlflow.log_feedback()`
+- Log Inspect AI eval scores as MLflow trace assessments via mlflow.log_feedback()
 - Scores appear in MLflow Traces UI assessment column with scorer name, value, and rationale
 - Assessment source: CODE/inspect_ai (deterministic, not LLM-based)
 - 42 unit tests
