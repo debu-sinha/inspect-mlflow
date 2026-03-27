@@ -46,8 +46,10 @@ dev = [
 
 [project.urls]
 Homepage = "https://github.com/debu-sinha/inspect-mlflow"
+Documentation = "https://inspect-mlflow.readthedocs.io/"
 Issues = "https://github.com/debu-sinha/inspect-mlflow/issues"
 Repository = "https://github.com/debu-sinha/inspect-mlflow"
+Changelog = "https://github.com/debu-sinha/inspect-mlflow/releases"
 
 [build-system]
 requires = ["hatchling"]
