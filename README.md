@@ -276,4 +276,4 @@ See [CONTRIBUTING.md](https://github.com/debu-sinha/inspect-mlflow/blob/main/CON
 ## Contributors
 
 - **Debu Sinha** - Creator and maintainer
-- **Vector Institute / National Research Council of Canada (NRC)** - Autolog provider support, contributed on behalf of the Canadian AI Safety Institute (CAISI). Consolidated from [VectorInstitute/inspect-mlflow](https://github.com/VectorInstitute/inspect-mlflow).
+- **Vector Institute / National Research Council of Canada (NRC)** - Autolog provider support and structured Inspect artifact table logging, contributed on behalf of the Canadian AI Safety Institute (CAISI). Consolidated from [VectorInstitute/inspect-mlflow](https://github.com/VectorInstitute/inspect-mlflow).
