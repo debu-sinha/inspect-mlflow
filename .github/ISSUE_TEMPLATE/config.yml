@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://inspect-mlflow.readthedocs.io
+    about: Check the docs before filing an issue
+  - name: Inspect AI
+    url: https://github.com/UKGovernmentBEIS/inspect_ai/issues
+    about: For Inspect AI core issues, file there instead

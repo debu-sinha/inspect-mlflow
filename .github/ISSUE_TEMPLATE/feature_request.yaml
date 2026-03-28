@@ -1,0 +1,42 @@
+name: Feature Request
+description: Suggest a new feature or enhancement
+labels: ["enhancement"]
+
+body:
+  - type: textarea
+    attributes:
+      label: Problem or use case
+      description: What problem does this solve? Why is the current behavior insufficient?
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Proposed solution
+      description: How should this work? Include API sketches or code examples if helpful.
+      render: python
+    validations:
+      required: false
+  - type: dropdown
+    attributes:
+      label: Area
+      description: Which part of inspect-mlflow does this relate to?
+      options:
+        - Tracking hook
+        - Tracing hook
+        - Evaluation comparison
+        - Autolog
+        - Artifact tables
+        - Scout import
+        - Configuration
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    attributes:
+      label: Willing to contribute?
+      options:
+        - "Yes, I can submit a PR"
+        - "Yes, with guidance"
+        - "No"
+    validations:
+      required: true

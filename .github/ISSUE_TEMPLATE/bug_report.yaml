@@ -1,0 +1,48 @@
+name: Bug Report
+description: Report a bug in inspect-mlflow
+labels: ["bug"]
+
+body:
+  - type: textarea
+    attributes:
+      label: What happened?
+      description: Describe the bug. Include the error message and traceback if applicable.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Steps to reproduce
+      description: Minimal code or steps to reproduce the issue.
+      render: python
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Expected behavior
+      description: What did you expect to happen?
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: inspect-mlflow version
+      placeholder: "0.7.0"
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: MLflow version
+      placeholder: "3.1.0"
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: Inspect AI version
+      placeholder: "0.3.197"
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: Python version
+      placeholder: "3.11"
+    validations:
+      required: true
