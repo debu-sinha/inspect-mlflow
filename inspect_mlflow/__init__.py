@@ -15,7 +15,7 @@ Install and use:
     inspect eval my_task.py
 """
 
-__version__ = "0.7.0"
+__version__ = "0.8.0"
 
 import contextlib
 

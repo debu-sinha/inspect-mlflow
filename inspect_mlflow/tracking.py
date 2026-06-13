@@ -53,7 +53,7 @@ from inspect_mlflow.artifacts.tables import (
     usage_to_dict,
 )
 from inspect_mlflow.config import MLflowSettings, load_settings
-from inspect_mlflow.util import score_to_numeric
+from inspect_mlflow.util import parse_iso8601, percentile, score_to_numeric
 
 _logger = logging.getLogger(__name__)
 
@@ -274,6 +274,8 @@ class MlflowTrackingHooks(Hooks):
                 pass
 
         if log.stats and log.stats.model_usage:
+            total_cost_usd: float = 0.0
+            cost_recorded_for_any_model = False
             for model_name, usage in log.stats.model_usage.items():
                 prefix = f"usage/{model_name}"
                 try:
@@ -288,6 +290,71 @@ class MlflowTrackingHooks(Hooks):
                     )
                 except Exception:
                     pass
+
+                # inspect_ai's ModelUsage.total_cost is populated by provider
+                # integrations that compute USD cost from token counts and
+                # current pricing. When present, surface it as an MLflow
+                # metric. When absent (None), record nothing for this model
+                # so the metric does not falsely report zero cost.
+                model_cost = getattr(usage, "total_cost", None)
+                if model_cost is not None:
+                    with contextlib.suppress(Exception):
+                        self.client.log_metric(
+                            task_run_id, f"{prefix}/total_cost_usd", float(model_cost)
+                        )
+                        total_cost_usd += float(model_cost)
+                        cost_recorded_for_any_model = True
+
+            if cost_recorded_for_any_model:
+                with contextlib.suppress(Exception):
+                    self.client.log_metric(task_run_id, "cost/total_usd", total_cost_usd)
+
+        # Aggregate latency metrics from per-sample timings on the log.
+        # inspect_ai records both wall-clock total_time and sandbox-aware
+        # working_time on each EvalSample. Wall-clock latency is what
+        # matters for SLA tracking; working_time excludes sandbox overhead
+        # and is closer to "what would happen in production." Log both.
+        if log.samples:
+            wall_times = [float(s.total_time) for s in log.samples if s.total_time is not None]
+            working_times = [
+                float(s.working_time) for s in log.samples if s.working_time is not None
+            ]
+            if wall_times:
+                wall_times_sorted = sorted(wall_times)
+                with contextlib.suppress(Exception):
+                    self.client.log_metric(
+                        task_run_id,
+                        "latency/per_sample_mean_seconds",
+                        sum(wall_times) / len(wall_times),
+                    )
+                    self.client.log_metric(
+                        task_run_id,
+                        "latency/per_sample_p50_seconds",
+                        percentile(wall_times_sorted, 0.50),
+                    )
+                    self.client.log_metric(
+                        task_run_id,
+                        "latency/per_sample_p95_seconds",
+                        percentile(wall_times_sorted, 0.95),
+                    )
+            if working_times:
+                with contextlib.suppress(Exception):
+                    self.client.log_metric(
+                        task_run_id,
+                        "latency/per_sample_working_mean_seconds",
+                        sum(working_times) / len(working_times),
+                    )
+
+        # Overall wall-clock duration of the eval run, derived from EvalStats
+        # started_at and completed_at. This is distinct from per-sample
+        # latency since the eval runner can parallelize across samples.
+        if log.stats and log.stats.started_at and log.stats.completed_at:
+            with contextlib.suppress(Exception):
+                started_dt = parse_iso8601(log.stats.started_at)
+                completed_dt = parse_iso8601(log.stats.completed_at)
+                if started_dt is not None and completed_dt is not None:
+                    duration_seconds = (completed_dt - started_dt).total_seconds()
+                    self.client.log_metric(task_run_id, "latency/total_seconds", duration_seconds)
 
         with self._lock:
             event_counts = self._event_counts.get(eval_id, {})

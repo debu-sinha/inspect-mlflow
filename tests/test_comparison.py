@@ -557,3 +557,127 @@ def test_dict_score_excluded():
     result = compare_evals(baseline, candidate)
     assert result.samples[0].baseline_score is None
     assert result.samples[0].candidate_score is None
+
+
+# --- Cost and latency comparison (v0.8.0) ---
+
+
+def _eval_log_with_cost_and_latency(
+    *,
+    cost_per_model: dict[str, float | None] | None = None,
+    sample_total_times: list[float] | None = None,
+    samples: list[EvalSample] | None = None,
+    task: str = "test_task",
+    model: str = "openai/gpt-4.1-mini",
+) -> EvalLog:
+    """Build an EvalLog with model_usage cost and per-sample timing."""
+    from inspect_ai.log._log import EvalStats
+    from inspect_ai.model._model_output import ModelUsage
+
+    if samples is None and sample_total_times is not None:
+        samples = [
+            EvalSample(
+                id=i,
+                epoch=1,
+                input=f"input_{i}",
+                target=f"target_{i}",
+                total_time=t,
+            )
+            for i, t in enumerate(sample_total_times)
+        ]
+
+    log = _make_eval_log(task=task, model=model, samples=samples)
+
+    if cost_per_model is not None:
+        log.stats = EvalStats(
+            started_at="2026-06-13T10:00:00+00:00",
+            completed_at="2026-06-13T10:05:00+00:00",
+            model_usage={
+                name: ModelUsage(
+                    input_tokens=100, output_tokens=50, total_tokens=150, total_cost=cost
+                )
+                for name, cost in cost_per_model.items()
+            },
+        )
+
+    return log
+
+
+def test_comparison_populates_cost_delta_when_both_logs_have_cost():
+    baseline = _eval_log_with_cost_and_latency(cost_per_model={"openai/gpt-4": 0.10})
+    candidate = _eval_log_with_cost_and_latency(cost_per_model={"openai/gpt-4.1-mini": 0.02})
+
+    result = compare_evals(baseline, candidate)
+
+    assert result.baseline_total_cost_usd == pytest.approx(0.10)
+    assert result.candidate_total_cost_usd == pytest.approx(0.02)
+    assert result.cost_delta_usd == pytest.approx(-0.08)
+
+
+def test_comparison_omits_cost_delta_when_neither_log_has_cost():
+    baseline = _make_eval_log()
+    candidate = _make_eval_log()
+
+    result = compare_evals(baseline, candidate)
+
+    assert result.baseline_total_cost_usd is None
+    assert result.candidate_total_cost_usd is None
+    assert result.cost_delta_usd is None
+
+
+def test_comparison_omits_cost_delta_when_only_one_log_has_cost():
+    """If only one side has cost data, delta is None rather than treating
+    the other side as zero."""
+    baseline = _eval_log_with_cost_and_latency(cost_per_model={"openai/gpt-4": 0.10})
+    candidate = _make_eval_log()
+
+    result = compare_evals(baseline, candidate)
+
+    assert result.baseline_total_cost_usd == pytest.approx(0.10)
+    assert result.candidate_total_cost_usd is None
+    assert result.cost_delta_usd is None
+
+
+def test_comparison_populates_latency_p95_delta_when_both_logs_have_timings():
+    baseline = _eval_log_with_cost_and_latency(
+        sample_total_times=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 2.0],
+    )
+    candidate = _eval_log_with_cost_and_latency(
+        sample_total_times=[0.1, 0.1, 0.1, 0.2, 0.2, 0.2, 0.3, 0.3, 0.3, 0.4, 0.5],
+    )
+
+    result = compare_evals(baseline, candidate)
+
+    assert result.baseline_latency_p95_seconds is not None
+    assert result.candidate_latency_p95_seconds is not None
+    # Candidate is faster at the tail, so delta should be negative.
+    assert result.latency_p95_delta_seconds < 0
+    assert result.candidate_latency_p95_seconds < result.baseline_latency_p95_seconds
+
+
+def test_comparison_omits_latency_delta_when_neither_log_has_timings():
+    baseline = _make_eval_log()
+    candidate = _make_eval_log()
+
+    result = compare_evals(baseline, candidate)
+
+    assert result.baseline_latency_p95_seconds is None
+    assert result.candidate_latency_p95_seconds is None
+    assert result.latency_p95_delta_seconds is None
+
+
+def test_summary_includes_cost_line_when_cost_present():
+    baseline = _eval_log_with_cost_and_latency(
+        cost_per_model={"openai/gpt-4": 0.10}, sample_total_times=[0.5]
+    )
+    candidate = _eval_log_with_cost_and_latency(
+        cost_per_model={"openai/gpt-4.1-mini": 0.02}, sample_total_times=[0.3]
+    )
+
+    result = compare_evals(baseline, candidate)
+    text = result.summary()
+
+    assert "Cost:" in text
+    assert "$0.1000" in text
+    assert "$0.0200" in text
+    assert "-$0.0800" in text  # negative delta rendered as signed dollar
