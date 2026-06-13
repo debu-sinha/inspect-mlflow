@@ -99,6 +99,30 @@ class ComparisonResult:
     samples: list[SampleComparison] = field(default_factory=list)
     """Per-sample score comparisons."""
 
+    baseline_total_cost_usd: float | None = None
+    """Total estimated USD cost of the baseline run, summed across all
+    models. None if no provider in inspect_ai surfaced a cost estimate."""
+
+    candidate_total_cost_usd: float | None = None
+    """Total estimated USD cost of the candidate run, summed across all
+    models. None if no provider in inspect_ai surfaced a cost estimate."""
+
+    cost_delta_usd: float | None = None
+    """Cost difference (candidate - baseline). Positive means the
+    candidate run cost more. None if either run lacks cost data."""
+
+    baseline_latency_p95_seconds: float | None = None
+    """95th-percentile per-sample wall-clock latency for the baseline run.
+    None if no per-sample timings are recorded."""
+
+    candidate_latency_p95_seconds: float | None = None
+    """95th-percentile per-sample wall-clock latency for the candidate run.
+    None if no per-sample timings are recorded."""
+
+    latency_p95_delta_seconds: float | None = None
+    """Latency p95 difference (candidate - baseline). Positive means the
+    candidate is slower at the tail. None if either run lacks timing data."""
+
     @functools.cached_property
     def _direction_counts(self) -> dict[str, int]:
         counts: dict[str, int] = {
@@ -213,6 +237,35 @@ class ComparisonResult:
             lines.append(
                 f"Candidate won on {self._direction_counts['improved']} "
                 f"of {self.aligned_count} samples ({self.win_rate:.1%})"
+            )
+
+        if self.cost_delta_usd is not None and self.baseline_total_cost_usd is not None:
+            sign = "+" if self.cost_delta_usd >= 0 else "-"
+            rel = ""
+            if self.baseline_total_cost_usd > 0:
+                pct = self.cost_delta_usd / self.baseline_total_cost_usd
+                pct_sign = "+" if pct >= 0 else "-"
+                rel = f" ({pct_sign}{abs(pct):.1%})"
+            lines.append(
+                f"Cost:        ${self.baseline_total_cost_usd:.4f} -> "
+                f"${self.candidate_total_cost_usd:.4f} "
+                f"({sign}${abs(self.cost_delta_usd):.4f}{rel})"
+            )
+
+        if (
+            self.latency_p95_delta_seconds is not None
+            and self.baseline_latency_p95_seconds is not None
+        ):
+            sign = "+" if self.latency_p95_delta_seconds >= 0 else "-"
+            rel = ""
+            if self.baseline_latency_p95_seconds > 0:
+                pct = self.latency_p95_delta_seconds / self.baseline_latency_p95_seconds
+                pct_sign = "+" if pct >= 0 else "-"
+                rel = f" ({pct_sign}{abs(pct):.1%})"
+            lines.append(
+                f"Latency p95: {self.baseline_latency_p95_seconds:.3f}s -> "
+                f"{self.candidate_latency_p95_seconds:.3f}s "
+                f"({sign}{abs(self.latency_p95_delta_seconds):.3f}s{rel})"
             )
 
         return "\n".join(lines)

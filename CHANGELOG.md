@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.8.0 (2026-06-13)
+
+### Added
+
+- **Cost and latency tracking per evaluation** (closes #22). The tracking hook now surfaces three new families of metrics derived from inspect_ai data already on `EvalLog`:
+  - `usage/<model>/total_cost_usd` and `cost/total_usd` when inspect_ai's `ModelUsage.total_cost` is populated by the provider integration.
+  - `latency/per_sample_mean_seconds`, `latency/per_sample_p50_seconds`, `latency/per_sample_p95_seconds`, and `latency/per_sample_working_mean_seconds` aggregated from `EvalSample.total_time` / `working_time`.
+  - `latency/total_seconds` from `EvalStats.started_at` and `completed_at`.
+- **Cost and latency deltas in `compare_evals`**. `ComparisonResult` gains six new optional fields: `baseline_total_cost_usd`, `candidate_total_cost_usd`, `cost_delta_usd`, `baseline_latency_p95_seconds`, `candidate_latency_p95_seconds`, `latency_p95_delta_seconds`. `ComparisonResult.summary()` includes new `Cost:` and `Latency p95:` lines when the underlying logs carry the data.
+- New `inspect_mlflow.util.percentile()` and `inspect_mlflow.util.parse_iso8601()` helpers (public).
+
+### Behavior
+
+- Cost metrics are **omitted (not zero)** when the underlying inspect_ai provider does not surface a cost estimate. This avoids the misleading appearance that an eval was free when the cost simply was not computed.
+- All new fields on `ComparisonResult` default to `None`. Existing consumers see no behavior change.
+
+### Tests
+
+- 10 new tests: 4 in `test_tracking.py` covering per-model cost logging, cost omission when `total_cost` is `None`, per-sample latency percentiles, and `latency/total_seconds`; 6 in `test_comparison.py` covering cost / latency delta population, None handling, and the new `summary()` lines.
+- 112 / 112 unit tests pass against `inspect-ai==0.3.236` and `mlflow==3.13.0`.
+
+### Verified
+
+- End-to-end run against `openai/gpt-4o-mini` confirmed the new latency metrics land in the MLflow UI alongside existing token usage metrics. Screenshot: `docs/screenshots/v0.8.0-run-detail.png`.
+
 ## 0.7.0 (2026-03-26)
 
 - Evaluation comparison and regression detection: `compare_evals()` aligns samples by (id, epoch), computes score deltas, runs significance tests (bootstrap CI for continuous, McNemar's for binary), and reports effect size (Cohen's d)

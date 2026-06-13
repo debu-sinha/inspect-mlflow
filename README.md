@@ -52,13 +52,15 @@ Activated when `MLFLOW_TRACKING_URI` is set. Creates hierarchical MLflow runs wi
 - Per-sample scores as step metrics (accuracy, timing per sample)
 - Aggregate metrics (total_samples, completed_samples, match/accuracy, match/stderr)
 - Model token usage (input/output/total tokens per model)
+- **Cost per model** (`usage/<model>/total_cost_usd`) and aggregate `cost/total_usd` when the inspect_ai provider surfaces cost (new in v0.8.0)
+- **Latency aggregates** (`latency/per_sample_mean_seconds`, `latency/per_sample_p50_seconds`, `latency/per_sample_p95_seconds`, `latency/total_seconds`) for SLA tracking (new in v0.8.0)
 - Real-time event counting (total_model_calls, total_tool_calls)
 - Eval artifacts: per-sample results JSON + full eval log JSON
 - Additional rich table artifacts for analysis (`inspect/*.json`)
 
-**Task run with 15 metrics, parameters, and parent run link:**
+**Task run with metrics including the v0.8.0 latency aggregates and per-model token usage:**
 
-![Task run detail](https://raw.githubusercontent.com/debu-sinha/inspect-mlflow/main/docs/images/screenshot-01-task-run.png)
+![Task run detail](https://raw.githubusercontent.com/debu-sinha/inspect-mlflow/main/docs/screenshots/v0.8.0-run-detail.png)
 
 **Artifact tables (inspect/) with structured eval data:**
 
@@ -144,18 +146,22 @@ for r in result.regressions:
 Output:
 
 ```
-Baseline:  openai/gpt-4o-mini (math_task)
+Baseline:  openai/gpt-4 (math_task)
 Candidate: openai/gpt-4o-mini (math_task)
 Samples:   5 aligned, 0 missing, 0 new
 
   Metric            Baseline  Candidate             Delta        Sig.
   -------------------------------------------------------------------
-  match/accuracy      0.6000     0.4000   -0.2000 (-33.3%)  p=0.048*
-  Effect size (match/accuracy): Cohen's d = -0.73 (medium effect)
+  match/accuracy      0.6000     0.5000   -0.1000 (-16.7%)  p=0.421
+  Effect size (match/accuracy): Cohen's d = -0.32 (small effect)
 
-Regressions: 2, Improvements: 1, Unchanged: 2
-Candidate won on 1 of 5 samples (20.0%)
+Regressions: 1, Improvements: 0, Unchanged: 4
+Candidate won on 0 of 5 samples (0.0%)
+Cost:        $0.1234 -> $0.0210 (-$0.1024 (-83.0%))
+Latency p95: 4.521s -> 1.937s (-2.584s (-57.2%))
 ```
+
+The summary answers the "cheaper but how much worse?" question in one screen. Use this when picking between a stronger model and a cheaper one.
 
 The comparison module aligns samples by (id, epoch), automatically selects the right significance test (McNemar's for binary scores, bootstrap CI for continuous), and computes Cohen's d effect size. No scipy required.
 
@@ -164,6 +170,7 @@ The comparison module aligns samples by (id, epoch), automatically selects the r
 - Regression threshold to filter noise (`regression_threshold=0.05`)
 - Sample filtering (`sample_filter=lambda s: s.id in subset`)
 - Win rate tracking across aligned samples
+- **Cost and latency deltas** when the underlying logs carry cost or per-sample timing data (new in v0.8.0)
 - Works with file paths or `EvalLog` objects directly
 
 ## Configuration

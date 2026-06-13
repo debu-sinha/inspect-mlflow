@@ -686,3 +686,163 @@ async def test_logs_inspect_table_artifacts(tmp_tracking_uri):
     events_payload = json.loads(Path(events_local).read_text())
     assert "event_type" in events_payload["columns"]
     assert len(events_payload["data"]) >= 2
+
+
+# --- Cost and latency metrics (v0.8.0) ---
+
+
+def _eval_log_with_stats(
+    *,
+    cost_per_model: dict[str, float | None] | None = None,
+    sample_total_times: list[float] | None = None,
+    started_at: str | None = None,
+    completed_at: str | None = None,
+) -> EvalLog:
+    """Build an EvalLog with EvalStats wired up for cost/latency testing.
+
+    Each kwarg corresponds to one feature axis of v0.8.0 metrics:
+    - cost_per_model populates ModelUsage.total_cost per model
+    - sample_total_times populates EvalSample.total_time per sample
+    - started_at / completed_at populate EvalStats timing for total_seconds
+    """
+    from inspect_ai.log._log import EvalStats
+
+    model_usage = None
+    if cost_per_model is not None:
+        model_usage = {
+            name: ModelUsage(
+                input_tokens=100,
+                output_tokens=50,
+                total_tokens=150,
+                total_cost=cost,
+            )
+            for name, cost in cost_per_model.items()
+        }
+
+    samples = None
+    if sample_total_times is not None:
+        samples = [
+            EvalSample(
+                id=i,
+                epoch=1,
+                input=f"input_{i}",
+                target=f"target_{i}",
+                total_time=t,
+            )
+            for i, t in enumerate(sample_total_times)
+        ]
+
+    stats = None
+    if model_usage is not None or started_at is not None:
+        stats = EvalStats(
+            started_at=started_at or "2026-06-13T10:00:00+00:00",
+            completed_at=completed_at or "2026-06-13T10:05:00+00:00",
+            model_usage=model_usage or {},
+        )
+
+    log = _make_eval_log(samples=samples)
+    if stats is not None:
+        log.stats = stats
+    return log
+
+
+@pytest.mark.anyio
+async def test_task_end_logs_per_model_cost_when_total_cost_present(tmp_tracking_uri):
+    """When inspect_ai's ModelUsage.total_cost is populated, the tracking
+    hook should log it as `usage/<model>/total_cost_usd` plus an aggregate
+    `cost/total_usd` metric."""
+    hook = MlflowTrackingHooks()
+    spec = _make_eval_spec()
+
+    await hook.on_run_start(RunStart(eval_set_id=None, run_id="run-001", task_names=["test_task"]))
+    await hook.on_task_start(
+        TaskStart(eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
+    )
+    task_run_id = hook._task_run_ids["eval-001"]
+
+    log = _eval_log_with_stats(
+        cost_per_model={"openai/gpt-4.1-mini": 0.012, "anthropic/claude-haiku": 0.008},
+    )
+    await hook.on_task_end(TaskEnd(eval_set_id=None, run_id="run-001", eval_id="eval-001", log=log))
+
+    metrics = mlflow.tracking.MlflowClient().get_run(task_run_id).data.metrics
+    assert metrics["usage/openai/gpt-4.1-mini/total_cost_usd"] == pytest.approx(0.012)
+    assert metrics["usage/anthropic/claude-haiku/total_cost_usd"] == pytest.approx(0.008)
+    assert metrics["cost/total_usd"] == pytest.approx(0.020)
+
+
+@pytest.mark.anyio
+async def test_task_end_omits_cost_when_total_cost_is_none(tmp_tracking_uri):
+    """When no model surfaces a cost estimate, the hook must NOT log a
+    zero-cost metric (which would falsely suggest the eval was free).
+    Token metrics should still be logged normally."""
+    hook = MlflowTrackingHooks()
+    spec = _make_eval_spec()
+
+    await hook.on_run_start(RunStart(eval_set_id=None, run_id="run-001", task_names=["test_task"]))
+    await hook.on_task_start(
+        TaskStart(eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
+    )
+    task_run_id = hook._task_run_ids["eval-001"]
+
+    log = _eval_log_with_stats(cost_per_model={"openai/gpt-4.1-mini": None})
+    await hook.on_task_end(TaskEnd(eval_set_id=None, run_id="run-001", eval_id="eval-001", log=log))
+
+    metrics = mlflow.tracking.MlflowClient().get_run(task_run_id).data.metrics
+    assert "usage/openai/gpt-4.1-mini/total_cost_usd" not in metrics
+    assert "cost/total_usd" not in metrics
+    # Token metrics still recorded.
+    assert metrics["usage/openai/gpt-4.1-mini/input_tokens"] == 100
+
+
+@pytest.mark.anyio
+async def test_task_end_logs_per_sample_latency_percentiles(tmp_tracking_uri):
+    """Per-sample wall-clock latencies must be aggregated into mean / p50 /
+    p95 metrics for SLA visibility."""
+    hook = MlflowTrackingHooks()
+    spec = _make_eval_spec()
+
+    await hook.on_run_start(RunStart(eval_set_id=None, run_id="run-001", task_names=["test_task"]))
+    await hook.on_task_start(
+        TaskStart(eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
+    )
+    task_run_id = hook._task_run_ids["eval-001"]
+
+    # 11 samples with a wide distribution so p95 differs from mean clearly.
+    log = _eval_log_with_stats(
+        sample_total_times=[0.1, 0.2, 0.2, 0.3, 0.4, 0.5, 0.6, 0.8, 1.0, 1.5, 5.0],
+    )
+    await hook.on_task_end(TaskEnd(eval_set_id=None, run_id="run-001", eval_id="eval-001", log=log))
+
+    metrics = mlflow.tracking.MlflowClient().get_run(task_run_id).data.metrics
+    assert "latency/per_sample_mean_seconds" in metrics
+    assert "latency/per_sample_p50_seconds" in metrics
+    assert "latency/per_sample_p95_seconds" in metrics
+    # p95 should clearly exceed mean for the long tail of 5.0s.
+    assert metrics["latency/per_sample_p95_seconds"] > metrics["latency/per_sample_mean_seconds"]
+    # p50 (median) of the 11-sample list above is 0.5.
+    assert metrics["latency/per_sample_p50_seconds"] == pytest.approx(0.5)
+
+
+@pytest.mark.anyio
+async def test_task_end_logs_total_run_latency_from_stats(tmp_tracking_uri):
+    """EvalStats started_at/completed_at delta is logged as
+    `latency/total_seconds` distinct from per-sample latency."""
+    hook = MlflowTrackingHooks()
+    spec = _make_eval_spec()
+
+    await hook.on_run_start(RunStart(eval_set_id=None, run_id="run-001", task_names=["test_task"]))
+    await hook.on_task_start(
+        TaskStart(eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
+    )
+    task_run_id = hook._task_run_ids["eval-001"]
+
+    log = _eval_log_with_stats(
+        cost_per_model={"openai/gpt-4.1-mini": 0.01},
+        started_at="2026-06-13T10:00:00+00:00",
+        completed_at="2026-06-13T10:05:00+00:00",
+    )
+    await hook.on_task_end(TaskEnd(eval_set_id=None, run_id="run-001", eval_id="eval-001", log=log))
+
+    metrics = mlflow.tracking.MlflowClient().get_run(task_run_id).data.metrics
+    assert metrics["latency/total_seconds"] == pytest.approx(300.0)  # 5 minutes
