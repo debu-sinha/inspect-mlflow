@@ -21,20 +21,25 @@ from inspect_mlflow.tracking import MlflowTrackingHooks  # noqa: F401
 
 @tool
 def calculator():
-    """Perform arithmetic calculations. Pass a math expression like '2+2' or '47*89'."""
+    """Perform one arithmetic operation on two numbers."""
 
-    async def run(expression: str) -> str:
-        """Evaluate a math expression and return the result.
+    async def run(a: float, operator: str, b: float) -> str:
+        """Calculate a single arithmetic operation.
 
         Args:
-            expression: A math expression to evaluate, e.g. "47 * 89"
+            a: First number.
+            operator: One of +, -, *, /.
+            b: Second number.
         """
-        try:
-            allowed = {"__builtins__": {}}
-            result = eval(expression, allowed)
-            return str(result)
-        except Exception as e:
-            return f"Error: {e}"
+        operations = {
+            "+": lambda: a + b,
+            "-": lambda: a - b,
+            "*": lambda: a * b,
+            "/": lambda: a / b,
+        }
+        if operator not in operations:
+            raise ValueError("Use +, -, *, or /.")
+        return f"{operations[operator]():g}"
 
     return run
 

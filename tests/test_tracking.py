@@ -202,7 +202,7 @@ async def test_task_creates_nested_run(tmp_tracking_uri):
 
     await hook.on_run_start(RunStart(eval_set_id=None, run_id="run-001", task_names=["test_task"]))
     await hook.on_task_start(
-        TaskStart(eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
+        TaskStart(plan=None, eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
     )
 
     assert "eval-001" in hook._task_run_ids
@@ -222,7 +222,7 @@ async def test_task_end_logs_metrics(tmp_tracking_uri):
 
     await hook.on_run_start(RunStart(eval_set_id=None, run_id="run-001", task_names=["test_task"]))
     await hook.on_task_start(
-        TaskStart(eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
+        TaskStart(plan=None, eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
     )
 
     task_run_id = hook._task_run_ids["eval-001"]
@@ -255,7 +255,7 @@ async def test_sample_end_logs_step_metrics(tmp_tracking_uri):
 
     await hook.on_run_start(RunStart(eval_set_id=None, run_id="run-001", task_names=["test_task"]))
     await hook.on_task_start(
-        TaskStart(eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
+        TaskStart(plan=None, eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
     )
 
     sample = MagicMock()
@@ -287,7 +287,7 @@ async def test_artifact_logging_disabled(tmp_tracking_uri, monkeypatch):
 
     await hook.on_run_start(RunStart(eval_set_id=None, run_id="run-001", task_names=["test_task"]))
     await hook.on_task_start(
-        TaskStart(eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
+        TaskStart(plan=None, eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
     )
 
     task_run_id = hook._task_run_ids["eval-001"]
@@ -528,7 +528,7 @@ async def test_full_lifecycle(tmp_tracking_uri):
     # Start
     await hook.on_run_start(RunStart(eval_set_id=None, run_id="run-001", task_names=["test_task"]))
     await hook.on_task_start(
-        TaskStart(eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
+        TaskStart(plan=None, eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
     )
 
     # Sample
@@ -583,7 +583,7 @@ async def test_logs_inspect_table_artifacts(tmp_tracking_uri):
 
     await hook.on_run_start(RunStart(eval_set_id=None, run_id="run-001", task_names=["test_task"]))
     await hook.on_task_start(
-        TaskStart(eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
+        TaskStart(plan=None, eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
     )
 
     task_run_id = hook._task_run_ids["eval-001"]
@@ -756,7 +756,7 @@ async def test_task_end_logs_per_model_cost_when_total_cost_present(tmp_tracking
 
     await hook.on_run_start(RunStart(eval_set_id=None, run_id="run-001", task_names=["test_task"]))
     await hook.on_task_start(
-        TaskStart(eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
+        TaskStart(plan=None, eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
     )
     task_run_id = hook._task_run_ids["eval-001"]
 
@@ -781,7 +781,7 @@ async def test_task_end_omits_cost_when_total_cost_is_none(tmp_tracking_uri):
 
     await hook.on_run_start(RunStart(eval_set_id=None, run_id="run-001", task_names=["test_task"]))
     await hook.on_task_start(
-        TaskStart(eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
+        TaskStart(plan=None, eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
     )
     task_run_id = hook._task_run_ids["eval-001"]
 
@@ -804,7 +804,7 @@ async def test_task_end_logs_per_sample_latency_percentiles(tmp_tracking_uri):
 
     await hook.on_run_start(RunStart(eval_set_id=None, run_id="run-001", task_names=["test_task"]))
     await hook.on_task_start(
-        TaskStart(eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
+        TaskStart(plan=None, eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
     )
     task_run_id = hook._task_run_ids["eval-001"]
 
@@ -833,7 +833,7 @@ async def test_task_end_logs_total_run_latency_from_stats(tmp_tracking_uri):
 
     await hook.on_run_start(RunStart(eval_set_id=None, run_id="run-001", task_names=["test_task"]))
     await hook.on_task_start(
-        TaskStart(eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
+        TaskStart(plan=None, eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
     )
     task_run_id = hook._task_run_ids["eval-001"]
 

@@ -29,9 +29,4 @@ Set environment variables and run evals as usual. Hooks auto-register via entry 
    scout
    api
 
-API Reference
--------------
-
-.. automodule:: inspect_mlflow
-   :members:
-   :undoc-members:
+See :doc:`api` for the complete API reference.

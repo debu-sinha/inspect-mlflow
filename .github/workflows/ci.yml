@@ -5,68 +5,87 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
-  pull_request_target:
-    branches: [main]
   workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   lint:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - uses: astral-sh/setup-uv@v7
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
-      - run: uv sync --group dev
-      - run: SKIP=no-commit-to-branch uv run pre-commit run --all-files
-      - run: uv run mypy inspect_mlflow/
+          python-version: "3.10"
+      - run: uv sync --locked --group dev --all-extras
+      - run: SKIP=no-commit-to-branch uv run --no-sync pre-commit run --all-files
+      - run: uv run --no-sync mypy inspect_mlflow/
 
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12", "3.13"]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - uses: astral-sh/setup-uv@v7
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
       - run: uv python install ${{ matrix.python-version }}
-      - run: uv sync --group dev --python ${{ matrix.python-version }}
+      - run: uv sync --locked --group dev --all-extras --python ${{ matrix.python-version }}
       - name: Run tests with coverage
-        run: uv run pytest tests/ -v --tb=short --cov=inspect_mlflow --cov-report=xml --cov-report=term-missing
+        run: uv run --no-sync pytest tests/ -v --tb=short --cov=inspect_mlflow --cov-report=xml --cov-report=term-missing
       - name: Enforce coverage threshold
-        run: uv run coverage report --fail-under=70
+        run: uv run --no-sync coverage report --fail-under=70
       - name: Upload coverage
         if: matrix.python-version == '3.12' && github.event_name == 'push'
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
         with:
-          file: coverage.xml
+          files: coverage.xml
           fail_ci_if_error: false
 
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - uses: hynek/build-and-inspect-python-package@v2
+          persist-credentials: false
+      - uses: hynek/build-and-inspect-python-package@2abe76da66d0a6a4a227101f9348ee855797cfa5 # v3.0.1
+
+  docs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          python-version: "3.12"
+      - run: uv sync --locked --all-extras --group docs
+      - run: uv run --no-sync sphinx-build -W --keep-going -b html docs/source docs/build
 
   check:
     if: always()
-    needs: [lint, test, build]
+    needs: [lint, test, build, docs]
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: All jobs passed
-        uses: re-actors/alls-green@release/v1
+        uses: re-actors/alls-green@b5b5b37504aa4183270bd3d855c52a67f212be35 # v1.3.0
         with:
           jobs: ${{ toJSON(needs) }}

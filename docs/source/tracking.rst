@@ -78,6 +78,4 @@ With artifact logging enabled, the tracking hook writes the following artifacts:
 API Reference
 -------------
 
-.. automodule:: inspect_mlflow.tracking
-   :members:
-   :undoc-members:
+See :doc:`api` for the complete API reference.

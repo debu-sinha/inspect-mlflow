@@ -3,16 +3,18 @@
 Imports MLflow traces into an Inspect Scout transcript database,
 enabling Scout scanners to analyze any MLflow-traced LLM application.
 
-Usage:
+Usage::
 
     from inspect_mlflow.scout import import_mlflow_traces
     from inspect_scout import transcripts_db
 
     async with transcripts_db("./my-transcripts") as db:
-        await db.insert(import_mlflow_traces(
-            experiment_name="inspect-mlflow-demo",
-            tracking_uri="http://localhost:5000",
-        ))
+        await db.insert(
+            import_mlflow_traces(
+                experiment_name="inspect-mlflow-demo",
+                tracking_uri="http://localhost:5000",
+            )
+        )
 """
 
 from __future__ import annotations

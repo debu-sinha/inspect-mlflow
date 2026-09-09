@@ -1,7 +1,7 @@
 """Configuration for inspect-mlflow hooks.
 
 Uses pydantic-settings when available for typed, validated config with the
-INSPECT_MLFLOW_ prefix. Falls back to os.getenv() when pydantic-settings
+``INSPECT_MLFLOW_`` prefix. Falls back to os.getenv() when pydantic-settings
 is not installed.
 """
 
@@ -13,6 +13,18 @@ from dataclasses import dataclass, field
 from typing import Annotated, Any
 
 DEFAULT_AUTOLOG_MODELS = ["openai", "anthropic", "langchain", "litellm"]
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    value = value.strip().lower()
+    if value in {"true", "1", "yes", "y", "on", "t"}:
+        return True
+    if value in {"false", "0", "no", "n", "off", "f"}:
+        return False
+    raise ValueError(f"{name} must be a boolean, got {value!r}")
 
 
 def _parse_autolog_models(value: Any) -> list[str]:
@@ -57,9 +69,11 @@ try:
             default_factory=lambda: os.getenv("MLFLOW_EXPERIMENT_NAME", "inspect_ai"),
         )
         tracing_enabled: bool = Field(
-            default_factory=lambda: os.getenv("MLFLOW_INSPECT_TRACING", "").lower() == "true",
+            default_factory=lambda: _env_bool("MLFLOW_INSPECT_TRACING", False),
         )
-        log_artifacts: bool = Field(default=True)
+        log_artifacts: bool = Field(
+            default_factory=lambda: _env_bool("MLFLOW_INSPECT_LOG_ARTIFACTS", True)
+        )
         autolog_enabled: bool = Field(default=True)
         autolog_models: Annotated[list[str], NoDecode] = Field(
             default_factory=lambda: DEFAULT_AUTOLOG_MODELS.copy()
@@ -84,17 +98,24 @@ except ImportError:
         autolog_models: list[str] = field(default_factory=lambda: DEFAULT_AUTOLOG_MODELS.copy())
 
         def __post_init__(self) -> None:
-            self.tracking_uri = os.getenv("MLFLOW_TRACKING_URI")
-            self.experiment_name = os.getenv("MLFLOW_EXPERIMENT_NAME", "inspect_ai")
-            self.tracing_enabled = os.getenv("MLFLOW_INSPECT_TRACING", "").lower() == "true"
-            # Support both old (MLFLOW_INSPECT_) and new (INSPECT_MLFLOW_) prefixes
-            _artifacts = os.getenv(
-                "INSPECT_MLFLOW_LOG_ARTIFACTS",
-                os.getenv("MLFLOW_INSPECT_LOG_ARTIFACTS", "true"),
+            self.tracking_uri = os.getenv(
+                "INSPECT_MLFLOW_TRACKING_URI", os.getenv("MLFLOW_TRACKING_URI")
             )
-            self.log_artifacts = _artifacts.lower() != "false"
-            _autolog_enabled = os.getenv("INSPECT_MLFLOW_AUTOLOG_ENABLED", "true")
-            self.autolog_enabled = _autolog_enabled.lower() != "false"
+            self.experiment_name = os.getenv(
+                "INSPECT_MLFLOW_EXPERIMENT_NAME", os.getenv("MLFLOW_EXPERIMENT_NAME", "inspect_ai")
+            )
+            self.tracing_enabled = (
+                _env_bool("INSPECT_MLFLOW_TRACING_ENABLED", False)
+                if "INSPECT_MLFLOW_TRACING_ENABLED" in os.environ
+                else _env_bool("MLFLOW_INSPECT_TRACING", False)
+            )
+            # Support both old (MLFLOW_INSPECT_) and new (INSPECT_MLFLOW_) prefixes
+            self.log_artifacts = (
+                _env_bool("INSPECT_MLFLOW_LOG_ARTIFACTS", True)
+                if "INSPECT_MLFLOW_LOG_ARTIFACTS" in os.environ
+                else _env_bool("MLFLOW_INSPECT_LOG_ARTIFACTS", True)
+            )
+            self.autolog_enabled = _env_bool("INSPECT_MLFLOW_AUTOLOG_ENABLED", True)
             self.autolog_models = _parse_autolog_models(os.getenv("INSPECT_MLFLOW_AUTOLOG_MODELS"))
 
 

@@ -60,6 +60,7 @@ class MlflowTracingHooks(Hooks):
         self._task_spans: dict[str, Any] = {}
         self._sample_spans: dict[str, Any] = {}
         self._inspect_spans: dict[str, Any] = {}
+        self._seen_events: dict[str, set[str]] = {}
         self._lock = threading.Lock()
         self._settings: MLflowSettings | None = None
 
@@ -109,6 +110,7 @@ class MlflowTracingHooks(Hooks):
         self._task_spans.clear()
         self._sample_spans.clear()
         self._inspect_spans.clear()
+        self._seen_events.clear()
 
     async def on_task_start(self, data: TaskStart) -> None:
         parent = self._run_spans.get(data.run_id)
@@ -181,6 +183,8 @@ class MlflowTracingHooks(Hooks):
             _logger.debug("Failed to start sample span", exc_info=True)
 
     async def on_sample_end(self, data: SampleEnd) -> None:
+        with self._lock:
+            self._seen_events.pop(data.sample_id, None)
         span = self._sample_spans.pop(data.sample_id, None)
         if span is None:
             return
@@ -232,11 +236,23 @@ class MlflowTracingHooks(Hooks):
                 _logger.debug("Failed to log assessment for %s", scorer_name, exc_info=True)
 
     async def on_sample_event(self, data: SampleEvent) -> None:
+        # Inspect publishes model calls before and after completion.
+        if getattr(data.event, "pending", False):
+            return
+
         sample_span = self._sample_spans.get(data.sample_id)
         if sample_span is None:
             return
 
         event = data.event
+        # Queued callbacks can carry the same mutable event after it completes.
+        event_id = getattr(event, "uuid", None)
+        if event_id and isinstance(event, (ModelEvent, ToolEvent)):
+            with self._lock:
+                seen = self._seen_events.setdefault(data.sample_id, set())
+                if event_id in seen:
+                    return
+                seen.add(event_id)
 
         try:
             if isinstance(event, SpanBeginEvent):

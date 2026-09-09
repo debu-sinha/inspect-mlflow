@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.1 (2026-09-09)
+
+- Count model/tool events once when Inspect dispatches pending and completed callbacks for the same event.
+- Use the configured tracking URI when constructing the MLflow client; honor modern environment overrides and boolean values consistently with or without the config extra.
+- Refresh the dependency lock and development tools, add Python 3.14 CI, and run a real Inspect/MLflow/Scout integration in the standard suite.
+- Run fork checks with read-only pull-request permissions, pin workflow actions, and make scheduled compatibility tests keep their upgraded dependencies.
+- Build documentation with warnings treated as errors and replace executable-expression examples with explicit arithmetic tools.
+
 ## 0.8.0 (2026-06-13)
 
 ### Added

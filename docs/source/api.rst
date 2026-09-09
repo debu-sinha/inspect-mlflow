@@ -2,8 +2,6 @@ API Reference
 =============
 
 .. automodule:: inspect_mlflow
-   :members:
-   :undoc-members:
 
 .. automodule:: inspect_mlflow.tracking
    :members:
@@ -14,8 +12,6 @@ API Reference
    :undoc-members:
 
 .. automodule:: inspect_mlflow.comparison
-   :members:
-   :undoc-members:
 
 .. automodule:: inspect_mlflow.comparison._compare
    :members:

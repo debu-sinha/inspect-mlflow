@@ -175,7 +175,7 @@ async def test_task_span_nested_under_run(tracing_env):
             RunStart(eval_set_id=None, run_id="run-001", task_names=["test_task"])
         )
         await hook.on_task_start(
-            TaskStart(eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
+            TaskStart(plan=None, eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
         )
 
         assert mock_mlflow.start_span_no_context.call_count == 2
@@ -199,7 +199,7 @@ async def test_task_end_logs_scores_and_closes_span(tracing_env):
             RunStart(eval_set_id=None, run_id="run-001", task_names=["test_task"])
         )
         await hook.on_task_start(
-            TaskStart(eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
+            TaskStart(plan=None, eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
         )
 
         log = EvalLog(
@@ -252,7 +252,7 @@ async def test_sample_span_nested_under_task(tracing_env):
             RunStart(eval_set_id=None, run_id="run-001", task_names=["test_task"])
         )
         await hook.on_task_start(
-            TaskStart(eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
+            TaskStart(plan=None, eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
         )
         await hook.on_sample_start(
             SampleStart(
@@ -287,7 +287,7 @@ async def test_sample_end_logs_scores_and_output(tracing_env):
 
         await hook.on_run_start(RunStart(eval_set_id=None, run_id="run-001", task_names=["t"]))
         await hook.on_task_start(
-            TaskStart(eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
+            TaskStart(plan=None, eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
         )
         await hook.on_sample_start(
             SampleStart(
@@ -331,7 +331,7 @@ async def test_sample_end_logs_score_assessments(tracing_env):
 
         await hook.on_run_start(RunStart(eval_set_id=None, run_id="run-001", task_names=["t"]))
         await hook.on_task_start(
-            TaskStart(eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
+            TaskStart(plan=None, eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
         )
         await hook.on_sample_start(
             SampleStart(
@@ -380,7 +380,7 @@ async def test_sample_end_logs_multiple_score_assessments(tracing_env):
 
         await hook.on_run_start(RunStart(eval_set_id=None, run_id="run-001", task_names=["t"]))
         await hook.on_task_start(
-            TaskStart(eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
+            TaskStart(plan=None, eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
         )
         await hook.on_sample_start(
             SampleStart(
@@ -438,7 +438,7 @@ async def test_model_event_creates_llm_span(tracing_env):
 
         await hook.on_run_start(RunStart(eval_set_id=None, run_id="run-001", task_names=["t"]))
         await hook.on_task_start(
-            TaskStart(eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
+            TaskStart(plan=None, eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
         )
         await hook.on_sample_start(
             SampleStart(
@@ -506,7 +506,7 @@ async def test_tool_event_creates_tool_span(tracing_env):
 
         await hook.on_run_start(RunStart(eval_set_id=None, run_id="run-001", task_names=["t"]))
         await hook.on_task_start(
-            TaskStart(eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
+            TaskStart(plan=None, eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
         )
         await hook.on_sample_start(
             SampleStart(
@@ -571,7 +571,7 @@ async def test_tool_event_with_error(tracing_env):
 
         await hook.on_run_start(RunStart(eval_set_id=None, run_id="run-001", task_names=["t"]))
         await hook.on_task_start(
-            TaskStart(eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
+            TaskStart(plan=None, eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
         )
         await hook.on_sample_start(
             SampleStart(
@@ -628,7 +628,7 @@ async def test_score_event_creates_evaluator_span(tracing_env):
 
         await hook.on_run_start(RunStart(eval_set_id=None, run_id="run-001", task_names=["t"]))
         await hook.on_task_start(
-            TaskStart(eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
+            TaskStart(plan=None, eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
         )
         await hook.on_sample_start(
             SampleStart(
@@ -686,7 +686,7 @@ async def test_span_begin_end_events_create_hierarchy(tracing_env):
 
         await hook.on_run_start(RunStart(eval_set_id=None, run_id="run-001", task_names=["t"]))
         await hook.on_task_start(
-            TaskStart(eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
+            TaskStart(plan=None, eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
         )
         await hook.on_sample_start(
             SampleStart(
@@ -756,7 +756,7 @@ async def test_nested_inspect_spans_preserve_hierarchy(tracing_env):
 
         await hook.on_run_start(RunStart(eval_set_id=None, run_id="run-001", task_names=["t"]))
         await hook.on_task_start(
-            TaskStart(eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
+            TaskStart(plan=None, eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
         )
         await hook.on_sample_start(
             SampleStart(
@@ -864,7 +864,7 @@ async def test_model_event_with_error(tracing_env):
 
         await hook.on_run_start(RunStart(eval_set_id=None, run_id="run-001", task_names=["t"]))
         await hook.on_task_start(
-            TaskStart(eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
+            TaskStart(plan=None, eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
         )
         await hook.on_sample_start(
             SampleStart(
@@ -923,7 +923,7 @@ async def test_model_event_with_cache_hit(tracing_env):
 
         await hook.on_run_start(RunStart(eval_set_id=None, run_id="run-001", task_names=["t"]))
         await hook.on_task_start(
-            TaskStart(eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
+            TaskStart(plan=None, eval_set_id=None, run_id="run-001", eval_id="eval-001", spec=spec)
         )
         await hook.on_sample_start(
             SampleStart(
