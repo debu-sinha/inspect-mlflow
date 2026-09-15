@@ -19,6 +19,11 @@ MLflow integration for [Inspect AI](https://inspect.aisi.org.uk/). Provides expe
 pip install inspect-mlflow
 ```
 
+The runtime dependency is `mlflow-skinny`, so this installs cleanly next to a full
+MLflow 2.20.3+ or 3.x install. Run tracking works on both lines. Execution tracing
+(`MLFLOW_INSPECT_TRACING=true`) needs MLflow 3; on MLflow 2 the tracing hook logs a
+warning and records nothing.
+
 ## Quick Start
 
 Hooks auto-register via entry points when the package is installed. No code changes needed.
