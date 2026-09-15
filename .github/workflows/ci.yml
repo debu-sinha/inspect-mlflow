@@ -57,6 +57,23 @@ jobs:
           files: coverage.xml
           fail_ci_if_error: false
 
+  test-mlflow-floor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: true
+          python-version: "3.12"
+      - run: uv sync --locked --group dev --all-extras
+      - name: Downgrade to the MLflow dependency floor
+        run: uv pip install "mlflow==2.20.3" "mlflow-skinny==2.20.3"
+      - run: uv run --no-sync python -c "import mlflow; assert mlflow.__version__ == '2.20.3', mlflow.__version__"
+      - run: uv run --no-sync pytest tests/ -v --tb=short
+
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -81,7 +98,7 @@ jobs:
 
   check:
     if: always()
-    needs: [lint, test, build, docs]
+    needs: [lint, test, test-mlflow-floor, build, docs]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

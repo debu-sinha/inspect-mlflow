@@ -2132,7 +2132,7 @@ name = "inspect-mlflow"
 source = { editable = "." }
 dependencies = [
     { name = "inspect-ai" },
-    { name = "mlflow" },
+    { name = "mlflow-skinny" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.11.*'" },
     { name = "numpy", version = "2.5.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
@@ -2153,6 +2153,7 @@ dev = [
     { name = "build" },
     { name = "codespell" },
     { name = "inspect-scout" },
+    { name = "mlflow" },
     { name = "mypy" },
     { name = "openai" },
     { name = "pip-audit" },
@@ -2174,7 +2175,7 @@ docs = [
 requires-dist = [
     { name = "inspect-ai", specifier = ">=0.3.180" },
     { name = "inspect-scout", marker = "extra == 'scout'", specifier = ">=0.1.0" },
-    { name = "mlflow", specifier = ">=3.0,<4.0" },
+    { name = "mlflow-skinny", specifier = ">=2.20.3,<4" },
     { name = "numpy", specifier = ">=1.24" },
     { name = "pydantic", marker = "extra == 'config'", specifier = ">=2.0" },
     { name = "pydantic-settings", marker = "extra == 'config'", specifier = ">=2.7" },
@@ -2187,6 +2188,7 @@ dev = [
     { name = "build", specifier = ">=1.4.2" },
     { name = "codespell", specifier = ">=2.4.3" },
     { name = "inspect-scout", specifier = ">=0.5.2" },
+    { name = "mlflow", specifier = ">=2.20.3,<4" },
     { name = "mypy", specifier = ">=2.3.1" },
     { name = "openai", specifier = ">=2.29.0" },
     { name = "pip-audit", specifier = ">=2.10.1" },

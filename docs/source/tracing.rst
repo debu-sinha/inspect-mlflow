@@ -3,6 +3,9 @@ Tracing Hook
 
 Activated when both ``MLFLOW_TRACKING_URI`` and ``MLFLOW_INSPECT_TRACING=true`` are set.
 
+Requires MLflow 3. On MLflow 2.x the hook logs a warning at run start and records no
+traces; the tracking hook is unaffected.
+
 Maps evaluation execution to MLflow trace spans, giving users a visual debugging view
 of every model call, tool invocation, and scoring step.
 
