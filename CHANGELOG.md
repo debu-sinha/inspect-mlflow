@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.8.1 (2026-09-09)
+## 0.8.1 (2026-09-15)
 
 - Count model/tool events once when Inspect dispatches pending and completed callbacks for the same event.
 - Use the configured tracking URI when constructing the MLflow client; honor modern environment overrides and boolean values consistently with or without the config extra.

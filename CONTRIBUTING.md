@@ -45,7 +45,6 @@ events, checks run metrics/artifacts/traces, and imports the trace with Scout.
 It uses a deterministic Inspect model and requires no external API credentials.
 Keep all extras installed so optional integrations are exercised as well.
 
-
 To test with a real MLflow server and OpenAI API:
 
 ```bash
