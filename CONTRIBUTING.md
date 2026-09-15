@@ -5,28 +5,28 @@
 ```bash
 git clone https://github.com/debu-sinha/inspect-mlflow.git
 cd inspect-mlflow
-uv sync --group dev
-uv run pre-commit install
+uv sync --locked --group dev --all-extras --group docs --python 3.10
+uv run --no-sync pre-commit install
 ```
 
 ## Running Tests
 
 ```bash
-uv run pytest tests/ -v
-uv run pytest tests/ --cov=inspect_mlflow --cov-report=term-missing
+uv run --no-sync pytest tests/ -v
+uv run --no-sync pytest tests/ --cov=inspect_mlflow --cov-report=term-missing
 
 # Run specific test modules
-uv run pytest tests/test_comparison.py -v    # comparison module
-uv run pytest tests/test_tracking.py -v      # tracking hook
-uv run pytest tests/test_tracing.py -v       # tracing hook
+uv run --no-sync pytest tests/test_comparison.py -v    # comparison module
+uv run --no-sync pytest tests/test_tracking.py -v      # tracking hook
+uv run --no-sync pytest tests/test_tracing.py -v       # tracing hook
 ```
 
 ## Linting
 
 ```bash
-uv run ruff check .
-uv run ruff format .
-uv run mypy inspect_mlflow/
+uv run --no-sync ruff check .
+uv run --no-sync ruff format .
+uv run --no-sync mypy inspect_mlflow/
 ```
 
 ## Pre-commit
@@ -34,10 +34,16 @@ uv run mypy inspect_mlflow/
 Pre-commit hooks run automatically on `git commit`. To run manually:
 
 ```bash
-uv run pre-commit run --all-files
+uv run --no-sync pre-commit run --all-files
 ```
 
 ## Integration Testing
+
+The normal test suite includes `tests/test_end_to_end.py`. It runs the installed
+Inspect hooks in a fresh process against SQLite MLflow, exercises model and tool
+events, checks run metrics/artifacts/traces, and imports the trace with Scout.
+It uses a deterministic Inspect model and requires no external API credentials.
+Keep all extras installed so optional integrations are exercised as well.
 
 To test with a real MLflow server and OpenAI API:
 
@@ -47,7 +53,7 @@ export MLFLOW_TRACKING_URI="http://127.0.0.1:5556"
 export MLFLOW_INSPECT_TRACING="true"
 export OPENAI_API_KEY="sk-..."
 
-uv run python -c "
+uv run --no-sync python -c "
 from inspect_ai import Task, eval
 from inspect_ai.dataset import Sample
 from inspect_ai.scorer import match
@@ -67,8 +73,7 @@ Open http://127.0.0.1:5556 to see runs and traces.
 ## Building Docs
 
 ```bash
-uv pip install sphinx furo
-sphinx-build -b html docs/source docs/build
+uv run --no-sync sphinx-build -W --keep-going -b html docs/source docs/build
 open docs/build/index.html
 ```
 
@@ -76,5 +81,5 @@ open docs/build/index.html
 
 - Keep PRs focused on a single change
 - Include tests for new functionality
-- Run `uv run pre-commit run --all-files` before pushing
+- Run `uv run --no-sync pre-commit run --all-files` before pushing
 - All CI checks must pass before merge

@@ -175,11 +175,14 @@ The comparison module aligns samples by (id, epoch), automatically selects the r
 
 ## Configuration
 
-Configuration is loaded from environment variables. When `pydantic-settings` is installed (`pip install inspect-mlflow[config]`), settings are typed and validated with the `INSPECT_MLFLOW_` prefix. Without it, standard `os.getenv()` is used.
+Configuration is loaded from environment variables. When `pydantic-settings` is installed (`pip install inspect-mlflow[config]`), settings are typed and validated with the `INSPECT_MLFLOW_` prefix. The same environment variables and boolean values work without it.
 
 | Env var | Required | Default | Description |
 |---------|----------|---------|-------------|
 | `MLFLOW_TRACKING_URI` | Yes | - | MLflow server URL |
+| `INSPECT_MLFLOW_TRACKING_URI` | No | - | Tracking URI override (takes priority) |
+| `INSPECT_MLFLOW_EXPERIMENT_NAME` | No | `inspect_ai` | Experiment name override |
+| `INSPECT_MLFLOW_TRACING_ENABLED` | No | `false` | Tracing override |
 | `MLFLOW_EXPERIMENT_NAME` | No | `inspect_ai` | Experiment name |
 | `MLFLOW_INSPECT_TRACING` | No | `false` | Enable execution tracing |
 | `MLFLOW_INSPECT_LOG_ARTIFACTS` | No | `true` | Log eval artifacts |
@@ -224,17 +227,17 @@ from inspect_ai.tool import tool
 
 
 @tool
-def calculator():
-    """Perform arithmetic calculations."""
+def multiply():
+    """Multiply two numbers."""
 
-    async def run(expression: str) -> str:
-        """Evaluate a math expression.
+    async def run(a: float, b: float) -> str:
+        """Multiply a by b.
 
         Args:
-            expression: A math expression to evaluate, e.g. "47 * 89"
+            a: First number.
+            b: Second number.
         """
-        allowed = {"__builtins__": {}}
-        return str(eval(expression, allowed))
+        return f"{a * b:g}"
 
     return run
 
@@ -242,20 +245,20 @@ def calculator():
 task = Task(
     dataset=[
         Sample(
-            input="Use the calculator to compute 47 * 89.",
+            input="Use the multiply tool to compute 47 * 89.",
             target="4183",
         ),
         Sample(
-            input="Use the calculator to compute 1024 / 16.",
+            input="Use the multiply tool to compute 8 * 8.",
             target="64",
         ),
     ],
-    solver=[use_tools([calculator()]), generate()],
+    solver=[use_tools([multiply()]), generate()],
     scorer=match(),
 )
 
 logs = eval(task, model="openai/gpt-4o-mini")
-# Traces now include TOOL spans for each calculator() call
+# Traces now include TOOL spans for each multiply() call
 # with function name, arguments, and result
 ```
 

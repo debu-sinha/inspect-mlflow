@@ -41,4 +41,4 @@ Data Mapping
 API Reference
 -------------
 
-.. autofunction:: inspect_mlflow.scout.import_mlflow_traces
+See :doc:`api` for the complete API reference.

@@ -105,15 +105,4 @@ Result Objects
 API Reference
 -------------
 
-.. autofunction:: inspect_mlflow.comparison.compare_evals
-
-.. autofunction:: inspect_mlflow.comparison._statistics.cohens_d
-
-.. autoclass:: inspect_mlflow.comparison.ComparisonResult
-   :members:
-
-.. autoclass:: inspect_mlflow.comparison.MetricComparison
-   :members:
-
-.. autoclass:: inspect_mlflow.comparison.SampleComparison
-   :members:
+See :doc:`api` for the complete API reference.

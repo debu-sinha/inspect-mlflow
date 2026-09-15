@@ -9,6 +9,11 @@ variables.
 Both ``MLFLOW_`` and ``INSPECT_MLFLOW_`` prefixes are supported. The
 ``INSPECT_MLFLOW_`` prefix takes priority when both are set.
 
+The corresponding overrides are ``INSPECT_MLFLOW_TRACKING_URI``,
+``INSPECT_MLFLOW_EXPERIMENT_NAME``, and ``INSPECT_MLFLOW_TRACING_ENABLED``.
+Boolean values accept ``true/false``, ``1/0``, ``yes/no``, and ``on/off``;
+invalid values raise a configuration error.
+
 .. list-table::
    :header-rows: 1
 
@@ -45,6 +50,4 @@ provider SDK are available in the environment.
 API Reference
 -------------
 
-.. automodule:: inspect_mlflow.config
-   :members:
-   :undoc-members:
+See :doc:`api` for the complete API reference.

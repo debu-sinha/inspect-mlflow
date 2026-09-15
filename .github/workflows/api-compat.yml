@@ -5,29 +5,36 @@ on:
     - cron: "0 0 * * 0" # Sunday midnight UTC
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   test-latest:
+    permissions:
+      contents: read
+      issues: write
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v6
-      - uses: astral-sh/setup-uv@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
       - name: Install with latest deps
         run: |
-          uv sync --group dev
-          uv pip install --upgrade inspect-ai mlflow
+          uv sync --upgrade --group dev --all-extras
+          uv pip check
       - name: Run tests
-        run: uv run pytest tests/ -v --tb=short
+        run: uv run --no-sync pytest tests/ -v --tb=short
       - name: Report versions
         if: always()
         run: |
-          echo "inspect-ai: $(uv run python -c 'import inspect_ai; print(inspect_ai.__version__)')"
-          echo "mlflow: $(uv run python -c 'import mlflow; print(mlflow.__version__)')"
+          echo "inspect-ai: $(uv run --no-sync python -c 'import inspect_ai; print(inspect_ai.__version__)')"
+          echo "mlflow: $(uv run --no-sync python -c 'import mlflow; print(mlflow.__version__)')"
 
       - name: Create issue on failure
         if: failure()
-        uses: actions/github-script@v8
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const title = `API compatibility failure: ${new Date().toISOString().slice(0, 10)}`;

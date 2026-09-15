@@ -88,6 +88,7 @@ class MlflowTrackingHooks(Hooks):
         self._sample_counts: dict[str, int] = {}
         self._model_usage: dict[str, dict[str, float]] = {}
         self._event_counts: dict[str, dict[str, int]] = {}
+        self._seen_events: dict[str, set[str]] = {}
         self._lock = threading.Lock()
         self._settings: MLflowSettings | None = None
         self._autolog_enabled = False
@@ -101,7 +102,7 @@ class MlflowTrackingHooks(Hooks):
     @property
     def client(self) -> MlflowClient:
         if self._client is None:
-            self._client = MlflowClient()
+            self._client = MlflowClient(tracking_uri=self.settings.tracking_uri)
         return self._client
 
     @property
@@ -115,7 +116,7 @@ class MlflowTrackingHooks(Hooks):
 
     async def on_run_start(self, data: RunStart) -> None:
         self._settings = load_settings()
-        self._client = MlflowClient()
+        self._client = MlflowClient(tracking_uri=self.settings.tracking_uri)
         self._artifact_manager = ArtifactManager(self._client, _logger)
         self._autolog_enabled = False
 
@@ -175,6 +176,7 @@ class MlflowTrackingHooks(Hooks):
         self._sample_counts.clear()
         self._model_usage.clear()
         self._event_counts.clear()
+        self._seen_events.clear()
 
     def _enable_autolog(self, models: list[str]) -> None:
         enabled_any = enable_autolog(models)
@@ -496,6 +498,8 @@ class MlflowTrackingHooks(Hooks):
         self.artifact_manager.log_eval_json(run_id, log)
 
     async def on_sample_end(self, data: SampleEnd) -> None:
+        with self._lock:
+            self._seen_events.pop(data.sample_id, None)
         eval_id = data.eval_id
         task_run_id = self._task_run_ids.get(eval_id)
         if not task_run_id:
@@ -523,6 +527,10 @@ class MlflowTrackingHooks(Hooks):
                 )
 
     async def on_sample_event(self, data: SampleEvent) -> None:
+        # Inspect publishes model calls before and after completion.
+        if getattr(data.event, "pending", False):
+            return
+
         eval_id = data.eval_id
         task_run_id = self._task_run_ids.get(eval_id)
         if not task_run_id:
@@ -534,6 +542,14 @@ class MlflowTrackingHooks(Hooks):
             counters = self._event_counts[eval_id]
 
         event = data.event
+        # Queued callbacks can carry the same mutable event after it completes.
+        event_id = getattr(event, "uuid", None)
+        if event_id and isinstance(event, (ModelEvent, ToolEvent)):
+            with self._lock:
+                seen = self._seen_events.setdefault(data.sample_id, set())
+                if event_id in seen:
+                    return
+                seen.add(event_id)
 
         if isinstance(event, ModelEvent):
             with self._lock:

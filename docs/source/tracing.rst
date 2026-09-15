@@ -47,6 +47,4 @@ Configuration
 API Reference
 -------------
 
-.. automodule:: inspect_mlflow.tracing
-   :members:
-   :undoc-members:
+See :doc:`api` for the complete API reference.

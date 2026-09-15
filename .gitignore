@@ -15,3 +15,9 @@ mlflow.db
 mlartifacts/
 mlruns/
 .coverage
+
+.venv-*/
+coverage.xml
+htmlcov/
+*.db-shm
+*.db-wal

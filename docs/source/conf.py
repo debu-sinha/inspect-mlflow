@@ -10,12 +10,11 @@ extensions = [
     "sphinx.ext.intersphinx",
 ]
 
-templates_path = ["_templates"]
+templates_path = []
 exclude_patterns = []
 
 html_theme = "furo"
 
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
-    "mlflow": ("https://mlflow.org/docs/latest", None),
 }
