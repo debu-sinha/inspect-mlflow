@@ -76,6 +76,13 @@ class MlflowTracingHooks(Hooks):
 
     async def on_run_start(self, data: RunStart) -> None:
         self._settings = load_settings()
+        if not hasattr(mlflow, "start_span_no_context"):
+            _logger.warning(
+                "MLflow tracing is enabled but mlflow %s does not support it. "
+                "Traces need mlflow>=3.0; run tracking still works.",
+                mlflow.__version__,
+            )
+            return
         mlflow.set_experiment(self.settings.experiment_name)
 
         try:
