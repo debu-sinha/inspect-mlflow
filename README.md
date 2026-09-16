@@ -182,6 +182,7 @@ Configuration is loaded from environment variables. When `pydantic-settings` is 
 | `MLFLOW_TRACKING_URI` | Yes | - | MLflow server URL |
 | `INSPECT_MLFLOW_TRACKING_URI` | No | - | Tracking URI override (takes priority) |
 | `INSPECT_MLFLOW_EXPERIMENT_NAME` | No | `inspect_ai` | Experiment name override |
+| `INSPECT_MLFLOW_PARENT_RUN_ID` | No | - | Log into this existing run instead of creating a parent run |
 | `INSPECT_MLFLOW_TRACING_ENABLED` | No | `false` | Tracing override |
 | `MLFLOW_EXPERIMENT_NAME` | No | `inspect_ai` | Experiment name |
 | `MLFLOW_INSPECT_TRACING` | No | `false` | Enable execution tracing |
