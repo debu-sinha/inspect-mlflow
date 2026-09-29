@@ -68,6 +68,7 @@ try:
         experiment_name: str = Field(
             default_factory=lambda: os.getenv("MLFLOW_EXPERIMENT_NAME", "inspect_ai"),
         )
+        parent_run_id: str | None = Field(default=None)
         tracing_enabled: bool = Field(
             default_factory=lambda: _env_bool("MLFLOW_INSPECT_TRACING", False),
         )
@@ -92,6 +93,7 @@ except ImportError:
 
         tracking_uri: str | None = None
         experiment_name: str = "inspect_ai"
+        parent_run_id: str | None = None
         tracing_enabled: bool = False
         log_artifacts: bool = True
         autolog_enabled: bool = True
@@ -104,6 +106,7 @@ except ImportError:
             self.experiment_name = os.getenv(
                 "INSPECT_MLFLOW_EXPERIMENT_NAME", os.getenv("MLFLOW_EXPERIMENT_NAME", "inspect_ai")
             )
+            self.parent_run_id = os.getenv("INSPECT_MLFLOW_PARENT_RUN_ID")
             self.tracing_enabled = (
                 _env_bool("INSPECT_MLFLOW_TRACING_ENABLED", False)
                 if "INSPECT_MLFLOW_TRACING_ENABLED" in os.environ

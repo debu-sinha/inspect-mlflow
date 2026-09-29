@@ -7,6 +7,7 @@ This matches MLflow's own testing best practices.
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -34,6 +35,7 @@ from inspect_ai.model._chat_message import ChatMessageAssistant
 from inspect_ai.model._generate_config import GenerateConfig
 from inspect_ai.model._model_output import ChatCompletionChoice, ModelOutput, ModelUsage
 from inspect_ai.scorer._metric import Score
+from mlflow.exceptions import MlflowException
 
 from inspect_mlflow.tracking import MlflowTrackingHooks
 from inspect_mlflow.util import score_to_numeric
@@ -190,6 +192,66 @@ async def test_run_end_with_exception(tmp_tracking_uri):
     client = mlflow.tracking.MlflowClient()
     run = client.get_run(parent_id)
     assert run.info.status == "FAILED"
+
+
+# --- Adopted parent run ---
+
+
+@pytest.mark.anyio
+async def test_adopts_caller_supplied_parent_run(tmp_tracking_uri, monkeypatch):
+    client = mlflow.tracking.MlflowClient()
+    owner_experiment_id = client.create_experiment("owner-experiment")
+    owner_run = client.create_run(experiment_id=owner_experiment_id, run_name="owner")
+    monkeypatch.setenv("INSPECT_MLFLOW_PARENT_RUN_ID", owner_run.info.run_id)
+
+    hook = MlflowTrackingHooks()
+    await hook.on_run_start(
+        RunStart(eval_set_id=None, run_id="run-abc123", task_names=["test_task"])
+    )
+    await hook.on_task_start(
+        TaskStart(
+            plan=None,
+            eval_set_id=None,
+            run_id="run-abc123",
+            eval_id="eval-001",
+            spec=_make_eval_spec(),
+        )
+    )
+    task_run_id = hook._task_run_ids["eval-001"]
+
+    assert hook._parent_run_id == owner_run.info.run_id
+
+    # Task runs nest under the adopted run and share its experiment, which is not
+    # the one MLFLOW_EXPERIMENT_NAME resolves to.
+    task_run = client.get_run(task_run_id)
+    assert task_run.data.tags["mlflow.parentRunId"] == owner_run.info.run_id
+    assert task_run.info.experiment_id == owner_experiment_id
+
+    await hook.on_run_end(RunEnd(eval_set_id=None, run_id="run-abc123", exception=None, logs=[]))
+
+    parent = client.get_run(owner_run.info.run_id)
+    assert parent.data.tags["inspect.run_id"] == "run-abc123"
+    assert parent.data.tags["inspect.task_count"] == "1"
+    assert parent.data.tags["inspect.tasks"] == "test_task"
+    # The owner of the run sets its final status, not the hook.
+    assert parent.info.status == "RUNNING"
+    assert hook._parent_run_id is None
+
+
+@pytest.mark.anyio
+async def test_unknown_parent_run_id_is_reported(tmp_tracking_uri, monkeypatch, caplog):
+    monkeypatch.setenv("INSPECT_MLFLOW_PARENT_RUN_ID", "no-such-run")
+    hook = MlflowTrackingHooks()
+
+    with caplog.at_level(logging.ERROR, logger="inspect_mlflow.tracking"):
+        with pytest.raises(MlflowException):
+            await hook.on_run_start(RunStart(eval_set_id=None, run_id="run-001", task_names=["t"]))
+
+    assert hook._parent_run_id is None
+    assert [r.getMessage() for r in caplog.records] == [
+        "Parent run no-such-run from INSPECT_MLFLOW_PARENT_RUN_ID could not be read; "
+        "this evaluation will not be tracked"
+    ]
 
 
 # --- Task lifecycle ---
