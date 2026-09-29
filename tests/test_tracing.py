@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -136,6 +137,26 @@ async def test_run_lifecycle_creates_and_ends_span(tracing_env):
         end_kwargs = mock_span.end.call_args.kwargs
         assert end_kwargs["status"] == "OK"
         assert end_kwargs["outputs"]["status"] == "OK"
+
+
+@pytest.mark.anyio
+async def test_run_start_warns_when_mlflow_lacks_tracing(tracing_env, caplog):
+    hook = MlflowTracingHooks()
+
+    with patch.object(_tracing_mod, "mlflow") as mock_mlflow:
+        del mock_mlflow.start_span_no_context
+        mock_mlflow.__version__ = "2.20.3"
+
+        with caplog.at_level(logging.WARNING, logger="inspect_mlflow.tracing"):
+            await hook.on_run_start(RunStart(eval_set_id=None, run_id="run-old", task_names=["t"]))
+
+        mock_mlflow.set_experiment.assert_not_called()
+
+    assert hook._run_spans == {}
+    assert [r.getMessage() for r in caplog.records] == [
+        "MLflow tracing is enabled but mlflow 2.20.3 does not support it. "
+        "Traces need mlflow>=3.0; run tracking still works."
+    ]
 
 
 @pytest.mark.anyio

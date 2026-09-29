@@ -517,6 +517,45 @@ def test_log_inspect_tables_falls_back_to_log_location(monkeypatch):
     assert "inspect/model_usage.json" in artifact_files
 
 
+def _logged_table(client, run_id, artifact_file, dst):
+    dst.mkdir()
+    path = client.download_artifacts(run_id, artifact_file, str(dst))
+    tag = json.loads(client.get_run(run_id).data.tags["mlflow.loggedArtifacts"])
+    return json.loads(Path(path).read_text()), tag
+
+
+def test_log_table_without_pandas_matches_mlflow_log_table(tmp_tracking_uri, tmp_path, monkeypatch):
+    """mlflow-skinny ships without pandas, so the fallback must match MLflow's own output."""
+    from mlflow.tracking import MlflowClient
+
+    from inspect_mlflow.artifacts import manager as manager_mod
+
+    client = MlflowClient()
+    experiment_id = client.create_experiment("tables")
+    columns = {"id": ["a", "b"], "score": [1.0, None], "passed": [True, False]}
+    artifact_manager = manager_mod.ArtifactManager(client)
+
+    native_run = client.create_run(experiment_id).info.run_id
+    artifact_manager.log_table(native_run, columns, "inspect/samples.json")
+
+    monkeypatch.setattr(manager_mod, "_pandas_available", lambda: False)
+    fallback_run = client.create_run(experiment_id).info.run_id
+    artifact_manager.log_table(fallback_run, columns, "inspect/samples.json")
+    artifact_manager.log_table(fallback_run, columns, "inspect/tasks.json")
+
+    native = _logged_table(client, native_run, "inspect/samples.json", tmp_path / "native")
+    fallback = _logged_table(client, fallback_run, "inspect/samples.json", tmp_path / "fallback")
+    assert fallback[0] == native[0]
+    assert fallback[0] == {
+        "columns": ["id", "score", "passed"],
+        "data": [["a", 1.0, True], ["b", None, False]],
+    }
+    assert fallback[1] == [
+        {"path": "inspect/samples.json", "type": "table"},
+        {"path": "inspect/tasks.json", "type": "table"},
+    ]
+
+
 # --- Full lifecycle integration ---
 
 

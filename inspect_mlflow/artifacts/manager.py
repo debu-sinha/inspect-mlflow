@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
-import contextlib
+import importlib.util
 import json
 import logging
 import os
+import posixpath
 import tempfile
 from typing import Any
 
 from inspect_ai.log import read_eval_log
 from mlflow.tracking import MlflowClient
+from mlflow.utils.mlflow_tags import MLFLOW_LOGGED_ARTIFACTS
 
 from inspect_mlflow.artifacts.tables import extract_inspect_table_rows, obj_get, rows_to_columns
 from inspect_mlflow.util import truncate
@@ -62,12 +64,41 @@ class ArtifactManager:
         for name, rows in tables.items():
             if not rows:
                 continue
-            with contextlib.suppress(Exception):
-                self.client.log_table(
-                    run_id=run_id,
-                    data=rows_to_columns(rows),
-                    artifact_file=f"inspect/{name}.json",
-                )
+            artifact_file = f"inspect/{name}.json"
+            try:
+                self.log_table(run_id, rows_to_columns(rows), artifact_file)
+            except Exception:
+                self.logger.debug("Failed to log table %s", artifact_file, exc_info=True)
+
+    def log_table(self, run_id: str, columns: dict[str, list[Any]], artifact_file: str) -> None:
+        """Log a column-oriented table the way ``MlflowClient.log_table`` does.
+
+        ``MlflowClient.log_table`` imports pandas, which ``mlflow-skinny`` does not
+        ship. Without pandas, write the same split-orient JSON directly and tag it
+        as a table so the MLflow UI still renders it.
+        """
+        if _pandas_available():
+            self.client.log_table(run_id=run_id, data=columns, artifact_file=artifact_file)
+            return
+
+        payload = {
+            "columns": list(columns),
+            "data": [list(row) for row in zip(*columns.values(), strict=True)],
+        }
+        artifact_dir, file_name = posixpath.split(artifact_file)
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            local_path = os.path.join(tmp_dir, file_name)
+            with open(local_path, "w", encoding="utf-8") as f:
+                json.dump(payload, f, default=str)
+            self.client.log_artifact(run_id, local_path, artifact_path=artifact_dir or None)
+
+        logged = json.loads(
+            self.client.get_run(run_id).data.tags.get(MLFLOW_LOGGED_ARTIFACTS, "[]")
+        )
+        entry = {"path": artifact_file, "type": "table"}
+        if entry not in logged:
+            logged.append(entry)
+            self.client.set_tag(run_id, MLFLOW_LOGGED_ARTIFACTS, json.dumps(logged))
 
     def load_full_eval_log(self, log: Any) -> Any | None:
         location = obj_get(log, "location")
@@ -135,3 +166,7 @@ class ArtifactManager:
             self.client.log_artifact(run_id, path, artifact_path="eval_logs")
         finally:
             os.unlink(path)
+
+
+def _pandas_available() -> bool:
+    return importlib.util.find_spec("pandas") is not None
