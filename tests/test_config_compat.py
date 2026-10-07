@@ -28,6 +28,12 @@ def settings_class(request, monkeypatch):
     return module.MLflowSettings
 
 
+def test_parent_run_id_is_read_from_env(settings_class, monkeypatch):
+    assert settings_class().parent_run_id is None
+    monkeypatch.setenv("INSPECT_MLFLOW_PARENT_RUN_ID", "run-abc123")
+    assert settings_class().parent_run_id == "run-abc123"
+
+
 @pytest.mark.parametrize("value", ["false", "False", "0", "no", "off"])
 def test_legacy_artifact_setting(settings_class, monkeypatch, value):
     monkeypatch.setenv("MLFLOW_INSPECT_LOG_ARTIFACTS", value)

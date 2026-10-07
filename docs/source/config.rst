@@ -26,6 +26,9 @@ invalid values raise a configuration error.
    * - ``MLFLOW_EXPERIMENT_NAME``
      - ``inspect_ai``
      - Experiment name
+   * - ``INSPECT_MLFLOW_PARENT_RUN_ID``
+     - --
+     - Log into this existing run instead of creating a parent run
    * - ``MLFLOW_INSPECT_TRACING``
      - ``false``
      - Enable execution tracing
@@ -41,6 +44,11 @@ invalid values raise a configuration error.
    * - ``INSPECT_MLFLOW_AUTOLOG_MODELS``
      - ``openai,anthropic,langchain,litellm``
      - CSV or JSON array of providers to autolog
+
+When ``INSPECT_MLFLOW_PARENT_RUN_ID`` is set, the tracking hook nests its task runs
+under that run instead of creating a parent of its own. It takes the experiment from
+the supplied run rather than from ``MLFLOW_EXPERIMENT_NAME``, and leaves the run for
+its owner to terminate.
 
 Autolog support map includes ``openai``, ``anthropic``, ``langchain``, ``litellm``,
 ``mistral``, ``groq``, ``cohere``, ``gemini``, and ``bedrock``.

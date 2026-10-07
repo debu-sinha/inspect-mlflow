@@ -83,6 +83,7 @@ class MlflowTrackingHooks(Hooks):
         self._artifact_manager: ArtifactManager | None = None
         self._experiment_id: str | None = None
         self._parent_run_id: str | None = None
+        self._adopted_parent = False
         self._task_run_ids: dict[str, str] = {}
         self._tasks: dict[str, EvalSpec] = {}
         self._sample_counts: dict[str, int] = {}
@@ -119,19 +120,40 @@ class MlflowTrackingHooks(Hooks):
         self._client = MlflowClient(tracking_uri=self.settings.tracking_uri)
         self._artifact_manager = ArtifactManager(self._client, _logger)
         self._autolog_enabled = False
+        self._adopted_parent = False
 
         if self.settings.tracking_uri:
             with contextlib.suppress(Exception):
                 mlflow.set_tracking_uri(self.settings.tracking_uri)
 
-        experiment = self._client.get_experiment_by_name(self.settings.experiment_name)
-        if experiment is None:
-            self._experiment_id = self._client.create_experiment(self.settings.experiment_name)
-        else:
-            self._experiment_id = experiment.experiment_id
+        adopted_run = None
+        if self.settings.parent_run_id:
+            try:
+                adopted_run = self._client.get_run(self.settings.parent_run_id)
+            except Exception:
+                _logger.error(
+                    "Parent run %s from INSPECT_MLFLOW_PARENT_RUN_ID could not be read; "
+                    "this evaluation will not be tracked",
+                    self.settings.parent_run_id,
+                )
+                raise
 
-        with contextlib.suppress(Exception):
-            mlflow.set_experiment(self.settings.experiment_name)
+        if adopted_run is not None:
+            # Take the experiment from the adopted run: task runs are created with
+            # `self._experiment_id`, so resolving `experiment_name` here would split
+            # the parent and its children across two experiments when the two disagree.
+            self._experiment_id = adopted_run.info.experiment_id
+            with contextlib.suppress(Exception):
+                mlflow.set_experiment(experiment_id=adopted_run.info.experiment_id)
+        else:
+            experiment = self._client.get_experiment_by_name(self.settings.experiment_name)
+            if experiment is None:
+                self._experiment_id = self._client.create_experiment(self.settings.experiment_name)
+            else:
+                self._experiment_id = experiment.experiment_id
+
+            with contextlib.suppress(Exception):
+                mlflow.set_experiment(self.settings.experiment_name)
 
         # Enable async logging for reduced hook latency
         with contextlib.suppress(Exception):
@@ -140,17 +162,26 @@ class MlflowTrackingHooks(Hooks):
         if self.settings.autolog_enabled:
             self._enable_autolog(self.settings.autolog_models)
 
-        run = self._client.create_run(
-            experiment_id=self._experiment_id,
-            run_name=f"inspect-{data.run_id[:8]}",
-            tags={
-                "inspect.run_id": data.run_id,
-                "inspect.task_count": str(len(data.task_names)),
-                "inspect.tasks": ", ".join(data.task_names),
-            },
-        )
-        self._parent_run_id = run.info.run_id
-        _logger.debug("Started parent run %s", self._parent_run_id)
+        run_tags = {
+            "inspect.run_id": data.run_id,
+            "inspect.task_count": str(len(data.task_names)),
+            "inspect.tasks": ", ".join(data.task_names),
+        }
+
+        if adopted_run is not None:
+            for key, value in run_tags.items():
+                self._client.set_tag(adopted_run.info.run_id, key, value)
+            self._parent_run_id = adopted_run.info.run_id
+            self._adopted_parent = True
+            _logger.debug("Adopted parent run %s", self._parent_run_id)
+        else:
+            run = self._client.create_run(
+                experiment_id=self._experiment_id,
+                run_name=f"inspect-{data.run_id[:8]}",
+                tags=run_tags,
+            )
+            self._parent_run_id = run.info.run_id
+            _logger.debug("Started parent run %s", self._parent_run_id)
 
     async def on_run_end(self, data: RunEnd) -> None:
         # End each task run by its specific run_id (not global stack)
@@ -161,12 +192,19 @@ class MlflowTrackingHooks(Hooks):
                 _logger.debug("Failed to terminate task run %s", run_id, exc_info=True)
 
         if self._parent_run_id:
-            status = "FAILED" if data.exception else "FINISHED"
-            try:
-                self.client.set_terminated(self._parent_run_id, status=status)
-            except Exception:
-                _logger.debug("Failed to terminate parent run", exc_info=True)
+            if self._adopted_parent:
+                _logger.debug(
+                    "Leaving adopted parent run %s for its owner to terminate",
+                    self._parent_run_id,
+                )
+            else:
+                status = "FAILED" if data.exception else "FINISHED"
+                try:
+                    self.client.set_terminated(self._parent_run_id, status=status)
+                except Exception:
+                    _logger.debug("Failed to terminate parent run", exc_info=True)
             self._parent_run_id = None
+            self._adopted_parent = False
 
         if self._autolog_enabled:
             self._disable_autolog()
