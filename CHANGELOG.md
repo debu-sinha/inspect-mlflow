@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.0 (2026-10-07)
+
+- Depend on `mlflow-skinny>=2.20.3,<4` instead of `mlflow>=3.0` so the package installs alongside MLflow 2.x tracking servers (#38, #50, thanks @ddishi).
+- Write the `inspect/*.json` tables without pandas when it is not installed, so skinny-only installs keep their tables in the MLflow UI (#50).
+- Warn at run start when tracing is enabled on an MLflow version without `start_span_no_context` instead of silently recording nothing (#50).
+- Add an MLflow 2.20.3 CI leg that runs the full suite, including the installed-hook integration, against the dependency floor (#43).
+
 ## 0.8.1 (2026-09-15)
 
 - Count model/tool events once when Inspect dispatches pending and completed callbacks for the same event.

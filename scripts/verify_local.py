@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 
+import mlflow
 from inspect_ai import Task, eval
 from inspect_ai.dataset import Sample
 from inspect_ai.model import ChatCompletionChoice, ChatMessageAssistant, ModelOutput, get_model
@@ -95,13 +96,19 @@ def main():
     artifacts = {a.path for a in client.list_artifacts(child.info.run_id, "inspect")}
     assert {"inspect/tasks.json", "inspect/samples.json", "inspect/events.json"} <= artifacts
     traces = client.search_traces(experiment_ids=[experiment_id])
-    assert len(traces) == 1, traces
-    spans = traces[0].data.spans
-    counts = {
-        kind: sum(s.span_type == kind for s in spans) for kind in ["LLM", "TOOL", "EVALUATOR"]
-    }
-    assert counts["LLM"] == 4 and counts["TOOL"] == 2 and counts["EVALUATOR"] == 2, counts
-    assert all(s.end_time_ns is not None for s in spans)
+    tracing_supported = hasattr(mlflow, "start_span_no_context")
+    if not tracing_supported:
+        # MLflow 2.x: the tracing hook warns and records nothing.
+        assert len(traces) == 0, traces
+        counts: dict[str, int] = {}
+    else:
+        assert len(traces) == 1, traces
+        spans = traces[0].data.spans
+        counts = {
+            kind: sum(s.span_type == kind for s in spans) for kind in ["LLM", "TOOL", "EVALUATOR"]
+        }
+        assert counts["LLM"] == 4 and counts["TOOL"] == 2 and counts["EVALUATOR"] == 2, counts
+        assert all(s.end_time_ns is not None for s in spans)
 
     async def check_scout():
         from inspect_mlflow.scout import import_mlflow_traces
@@ -111,10 +118,11 @@ def main():
         assert len(transcripts[0].events) == 8
         return len(transcripts)
 
-    imported = asyncio.run(check_scout())
+    imported = asyncio.run(check_scout()) if tracing_supported else 0
     print(
         json.dumps(
             {
+                "mlflow": mlflow.__version__,
                 "runs": len(runs),
                 "traces": len(traces),
                 "spans": counts,
