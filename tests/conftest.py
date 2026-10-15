@@ -24,6 +24,9 @@ def tmp_tracking_uri(tmp_path, monkeypatch):
     # Disable async logging in tests so writes are visible immediately
     with contextlib.suppress(Exception):
         mlflow.config.enable_async_logging(False)
+    # Create the database now rather than on first use: on MLflow 2.x the schema
+    # migration reconfigures logging, which would drop caplog's handler mid-test.
+    mlflow.tracking.MlflowClient().search_experiments()
     yield uri
     mlflow.set_tracking_uri(None)
 
