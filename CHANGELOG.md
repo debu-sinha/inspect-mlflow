@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.10.0 (2026-11-22)
+
+- Let the tracking hook adopt a caller-supplied parent run through `INSPECT_MLFLOW_PARENT_RUN_ID`, so an eval launched from an outer MLflow job nests under that job's run. The hook leaves the adopted run open for its owner to terminate. If the run cannot be read, the hook logs an error and creates its own parent run instead (#39, #45, thanks @ddishi).
+- Refresh the dependency lock and pinned workflow actions (#57, #59).
+
 ## 0.9.0 (2026-10-07)
 
 - Depend on `mlflow-skinny>=2.20.3,<4` instead of `mlflow>=3.0` so the package installs alongside MLflow 2.x tracking servers (#38, #50, thanks @ddishi).
